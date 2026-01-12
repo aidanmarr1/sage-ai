@@ -1,45 +1,169 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { useTerminalStore } from "@/stores/terminalStore";
+import { getWebContainer, spawnShell, initialFiles } from "@/lib/webcontainer";
 import { cn } from "@/lib/cn";
-import { format } from "date-fns";
-import { Terminal, Circle, Copy, Trash2, ChevronRight } from "lucide-react";
+import { Terminal as TerminalIcon, Circle, RotateCcw, Loader2 } from "lucide-react";
 
 export function TerminalView() {
-  const { terminalLines, addTerminalLine } = useWorkspaceStore();
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const initializedRef = useRef(false);
-  const [copied, setCopied] = useState(false);
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<any>(null);
+  const fitAddonRef = useRef<any>(null);
+  const shellRef = useRef<any>(null);
+  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [terminalLines]);
+  const { isBooting, isReady, error, setBooting, setReady, setError, setWebContainer } =
+    useTerminalStore();
 
-  // Add some demo output on mount
-  useEffect(() => {
-    if (!initializedRef.current && terminalLines.length === 0) {
-      initializedRef.current = true;
-      addTerminalLine({ type: "info", content: "Sage AI Terminal v1.0.0" });
-      addTerminalLine({ type: "info", content: "Ready for commands..." });
-      addTerminalLine({ type: "output", content: "" });
-      addTerminalLine({ type: "input", content: "$ npm run dev" });
-      addTerminalLine({
-        type: "output",
-        content: "   - Local:        http://localhost:3000",
+  const initTerminal = useCallback(async () => {
+    if (!terminalRef.current || xtermRef.current) return;
+
+    setBooting(true);
+    setError(null);
+
+    try {
+      // Dynamically import xterm to avoid SSR issues
+      const { Terminal } = await import("@xterm/xterm");
+      const { FitAddon } = await import("@xterm/addon-fit");
+
+      // Create terminal instance
+      const terminal = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: '"JetBrains Mono", monospace',
+        theme: {
+          background: "#fafafa",
+          foreground: "#374151",
+          cursor: "#6b9b76",
+          cursorAccent: "#ffffff",
+          selectionBackground: "#6b9b7640",
+          black: "#374151",
+          red: "#9b6b6b",
+          green: "#6b9b76",
+          yellow: "#9b966b",
+          blue: "#6b7d9b",
+          magenta: "#8b6b9b",
+          cyan: "#6b959b",
+          white: "#9ca3af",
+          brightBlack: "#6b7280",
+          brightRed: "#b08080",
+          brightGreen: "#80b08a",
+          brightYellow: "#b0ab80",
+          brightBlue: "#8090b0",
+          brightMagenta: "#a080b0",
+          brightCyan: "#80a8b0",
+          brightWhite: "#d1d5db",
+        },
+        allowProposedApi: true,
       });
-      addTerminalLine({
-        type: "output",
-        content: "   - Ready in 1.2s",
+
+      const fitAddon = new FitAddon();
+      terminal.loadAddon(fitAddon);
+      terminal.open(terminalRef.current);
+      fitAddon.fit();
+
+      xtermRef.current = terminal;
+      fitAddonRef.current = fitAddon;
+
+      // Write welcome message
+      terminal.writeln("\x1b[32m╭─────────────────────────────────────────╮\x1b[0m");
+      terminal.writeln("\x1b[32m│\x1b[0m   \x1b[1mSage Terminal\x1b[0m - Linux Environment    \x1b[32m│\x1b[0m");
+      terminal.writeln("\x1b[32m╰─────────────────────────────────────────╯\x1b[0m");
+      terminal.writeln("");
+      terminal.writeln("\x1b[33mBooting WebContainer...\x1b[0m");
+
+      // Boot WebContainer
+      const webcontainer = await getWebContainer();
+      setWebContainer(webcontainer);
+
+      // Mount initial files
+      await webcontainer.mount(initialFiles);
+
+      terminal.writeln("\x1b[32m✓ WebContainer ready!\x1b[0m");
+      terminal.writeln("");
+
+      // Spawn shell
+      const shell = await spawnShell(webcontainer, (data) => {
+        terminal.write(data);
       });
+
+      shellRef.current = shell;
+
+      // Handle terminal input
+      terminal.onData((data) => {
+        shell.write(data);
+      });
+
+      // Handle resize
+      terminal.onResize(({ cols, rows }) => {
+        shell.resize(cols, rows);
+      });
+
+      setReady(true);
+    } catch (err) {
+      console.error("Terminal initialization error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to initialize terminal";
+      setError(errorMessage);
+
+      if (xtermRef.current) {
+        xtermRef.current.writeln(`\x1b[31m✗ Error: ${errorMessage}\x1b[0m`);
+        xtermRef.current.writeln("\x1b[33mNote: WebContainers require specific browser headers.\x1b[0m");
+        xtermRef.current.writeln("\x1b[33mThis feature works in development but may need\x1b[0m");
+        xtermRef.current.writeln("\x1b[33mspecial configuration for production deployment.\x1b[0m");
+      }
+    } finally {
+      setBooting(false);
     }
-  }, [addTerminalLine, terminalLines.length]);
+  }, [setBooting, setReady, setError, setWebContainer]);
 
-  const handleCopy = () => {
-    const text = terminalLines.map((l) => l.content).join("\n");
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Initialize on mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && terminalRef.current && !xtermRef.current) {
+      initTerminal();
+    }
+  }, [mounted, initTerminal]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (shellRef.current) {
+        shellRef.current.kill();
+      }
+      if (xtermRef.current) {
+        xtermRef.current.dispose();
+      }
+    };
+  }, []);
+
+  const handleRestart = () => {
+    if (shellRef.current) {
+      shellRef.current.kill();
+    }
+    if (xtermRef.current) {
+      xtermRef.current.dispose();
+      xtermRef.current = null;
+    }
+    shellRef.current = null;
+    fitAddonRef.current = null;
+    setReady(false);
+    initTerminal();
   };
 
   return (
@@ -48,78 +172,62 @@ export function TerminalView() {
       <div className="relative flex h-11 items-center justify-between border-b border-grey-100 bg-grey-50/50 px-4">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-grey-100">
-            <Terminal className="h-4 w-4 text-grey-600" />
+            <TerminalIcon className="h-4 w-4 text-grey-600" />
           </div>
           <span className="text-sm font-medium text-grey-700">Terminal</span>
           <span className="rounded-full bg-sage-100 px-2 py-0.5 text-xs font-medium text-sage-700">
-            bash
+            jsh
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={handleCopy}
-            className={cn(
-              "flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-all",
-              copied
-                ? "bg-sage-100 text-sage-700"
-                : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
-            )}
+            onClick={handleRestart}
+            disabled={isBooting}
+            className="flex h-7 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600 disabled:opacity-50"
           >
-            <Copy className="h-3.5 w-3.5" />
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <button className="flex h-7 w-7 items-center justify-center rounded-lg text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600">
-            <Trash2 className="h-3.5 w-3.5" />
+            <RotateCcw className="h-3.5 w-3.5" />
+            Restart
           </button>
         </div>
       </div>
 
-      {/* Terminal Output */}
-      <div className="flex-1 overflow-y-auto bg-grey-50 p-4 font-mono text-sm">
-        {terminalLines.map((line) => (
-          <div
-            key={line.id}
-            className={cn(
-              "flex items-start gap-3 py-1 leading-relaxed",
-              {
-                input: "text-sage-700",
-                output: "text-grey-600",
-                error: "text-grey-500",
-                info: "text-sage-600",
-              }[line.type]
-            )}
-          >
-            <span className="select-none text-grey-400 text-xs min-w-[60px]">
-              {format(line.timestamp, "HH:mm:ss")}
-            </span>
-            {line.type === "input" && (
-              <ChevronRight className="h-4 w-4 flex-shrink-0 text-sage-500 mt-0.5" />
-            )}
-            {line.type !== "input" && <span className="w-4 flex-shrink-0" />}
-            <span className="whitespace-pre-wrap">{line.content}</span>
-          </div>
-        ))}
+      {/* Terminal */}
+      <div className="relative flex-1 overflow-hidden bg-grey-50">
+        <div
+          ref={terminalRef}
+          className="h-full w-full p-2"
+          style={{ minHeight: "200px" }}
+        />
 
-        {/* Cursor line */}
-        <div className="flex items-center gap-3 py-1 text-sage-700">
-          <span className="select-none text-grey-400 text-xs min-w-[60px]">
-            {format(new Date(), "HH:mm:ss")}
-          </span>
-          <ChevronRight className="h-4 w-4 flex-shrink-0 text-sage-500" />
-          <span className="inline-block h-4 w-2 animate-pulse bg-sage-500" />
-        </div>
-        <div ref={bottomRef} />
+        {/* Loading overlay */}
+        {isBooting && !xtermRef.current && (
+          <div className="absolute inset-0 flex items-center justify-center bg-grey-50">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-sage-500" />
+              <span className="text-sm text-grey-500">Booting Linux environment...</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <div className="flex h-8 items-center justify-between border-t border-grey-200 bg-white px-4">
         <div className="flex items-center gap-2">
-          <Circle className="h-2 w-2 fill-sage-500 text-sage-500" />
-          <span className="text-xs text-grey-500">Connected</span>
+          <Circle
+            className={cn(
+              "h-2 w-2",
+              isReady
+                ? "fill-sage-500 text-sage-500"
+                : error
+                ? "fill-grey-400 text-grey-400"
+                : "fill-sage-300 text-sage-300 animate-pulse"
+            )}
+          />
+          <span className="text-xs text-grey-500">
+            {isBooting ? "Booting..." : isReady ? "Connected" : error ? "Error" : "Initializing..."}
+          </span>
         </div>
-        <span className="font-mono text-xs text-grey-400">
-          {terminalLines.length} lines
-        </span>
+        <span className="font-mono text-xs text-grey-400">WebContainer</span>
       </div>
     </div>
   );
