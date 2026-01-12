@@ -70,11 +70,8 @@ export function MainLayout() {
         </div>
       </div>
 
-      {/* Auth Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-      />
+      {/* Auth Modal - cannot be closed, must sign in */}
+      <AuthModal isOpen={showAuthModal} />
     </>
   );
 }

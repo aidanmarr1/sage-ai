@@ -2,16 +2,14 @@
 
 import { useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import { cn } from "@/lib/cn";
-import { X, Mail, Lock, User, Loader2, Sparkles } from "lucide-react";
+import { Mail, Lock, User, Loader2, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 interface AuthModalProps {
   isOpen: boolean;
-  onClose: () => void;
 }
 
-export function AuthModal({ isOpen, onClose }: AuthModalProps) {
+export function AuthModal({ isOpen }: AuthModalProps) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +33,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       }
 
       if (result.success) {
-        onClose();
+        // Auth successful - modal will close automatically via isAuthenticated state
         setEmail("");
         setPassword("");
         setName("");
@@ -51,22 +49,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-grey-900/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      {/* Backdrop - no click to close */}
+      <div className="absolute inset-0 bg-grey-900/50 backdrop-blur-sm" />
 
-      {/* Modal */}
+      {/* Modal - no close button */}
       <div className="relative w-full max-w-md animate-fade-in rounded-3xl bg-white p-8 shadow-2xl">
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-grey-400 transition-colors hover:bg-grey-100 hover:text-grey-600"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
         {/* Logo */}
         <div className="mb-6 flex justify-center">
           <Image

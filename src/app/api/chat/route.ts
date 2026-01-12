@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
@@ -43,6 +44,15 @@ Do not use markdown. Use plain numbered lists (1. 2. 3. etc).`,
 
 export async function POST(request: NextRequest) {
   try {
+    // Authentication required
+    const user = await getSession();
+    if (!user) {
+      return NextResponse.json(
+        { error: "Authentication required. Please sign in to use Sage." },
+        { status: 401 }
+      );
+    }
+
     if (!DEEPSEEK_API_KEY) {
       console.error("DEEPSEEK_API_KEY is not configured");
       return NextResponse.json(

@@ -131,7 +131,12 @@ export function ChatInput() {
         }),
       });
 
-      if (!ackResponse.ok) throw new Error("Failed to get acknowledgement");
+      if (!ackResponse.ok) {
+        if (ackResponse.status === 401) {
+          throw new Error("Please sign in to use Sage.");
+        }
+        throw new Error("Failed to get acknowledgement");
+      }
 
       const ackData = await ackResponse.json();
 
@@ -160,7 +165,12 @@ export function ChatInput() {
         }),
       });
 
-      if (!planResponse.ok) throw new Error("Failed to generate plan");
+      if (!planResponse.ok) {
+        if (planResponse.status === 401) {
+          throw new Error("Please sign in to use Sage.");
+        }
+        throw new Error("Failed to generate plan");
+      }
 
       const planData = await planResponse.json();
 
@@ -202,9 +212,10 @@ export function ChatInput() {
       console.error("Error:", error);
       setTyping(false);
       setGenerating(false);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       addMessage({
         role: "assistant",
-        content: "I apologize, but I encountered an error processing your request. Please try again.",
+        content: errorMessage,
         status: "sent",
       });
     } finally {
