@@ -1,14 +1,38 @@
-import { createClient } from "@libsql/client";
+import { createClient, Client } from "@libsql/client";
 
-export const db = createClient({
-  url: process.env.TURSO_DATABASE_URL!,
-  authToken: process.env.TURSO_AUTH_TOKEN,
+let _db: Client | null = null;
+
+export function getDb(): Client {
+  if (!_db) {
+    if (!process.env.TURSO_DATABASE_URL) {
+      throw new Error("TURSO_DATABASE_URL is not configured");
+    }
+    _db = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+  }
+  return _db;
+}
+
+// For backwards compatibility - proxy to lazy-initialized client
+export const db = new Proxy({} as Client, {
+  get(_target, prop) {
+    const client = getDb();
+    const value = client[prop as keyof Client];
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
+  },
 });
 
 // Initialize database schema
 export async function initializeDatabase() {
+  const client = getDb();
+
   // Users table
-  await db.execute(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -19,12 +43,12 @@ export async function initializeDatabase() {
     )
   `);
 
-  await db.execute(`
+  await client.execute(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
   `);
 
   // Conversations table
-  await db.execute(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -36,12 +60,12 @@ export async function initializeDatabase() {
     )
   `);
 
-  await db.execute(`
+  await client.execute(`
     CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id)
   `);
 
   // Messages table
-  await db.execute(`
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
@@ -52,7 +76,7 @@ export async function initializeDatabase() {
     )
   `);
 
-  await db.execute(`
+  await client.execute(`
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id)
   `);
 }
