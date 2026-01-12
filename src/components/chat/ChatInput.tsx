@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, KeyboardEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useChatStore } from "@/stores/chatStore";
 import { usePlanStore } from "@/stores/planStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -13,6 +14,7 @@ import { nanoid } from "nanoid";
 import type { ImageAttachment } from "@/types";
 
 export function ChatInput() {
+  const router = useRouter();
   const { inputValue, setInputValue, addMessage, setTyping, clearMessages } = useChatStore();
   const { setPlan, setGenerating } = usePlanStore();
   const { setActiveTab } = useWorkspaceStore();
@@ -113,6 +115,8 @@ export function ChatInput() {
             status: "sent",
             images: attachedImages.length > 0 ? attachedImages : undefined,
           });
+          // Navigate to the new task URL
+          router.push(`/task/${conv.id}`);
         }
       }
 
@@ -221,7 +225,7 @@ export function ChatInput() {
     } finally {
       setIsProcessing(false);
     }
-  }, [inputValue, attachedImages, isProcessing, isAuthenticated, currentConversationId, addMessage, setInputValue, setTyping, setGenerating, setActiveTab, setPlan, createConversation, clearMessages]);
+  }, [inputValue, attachedImages, isProcessing, isAuthenticated, currentConversationId, addMessage, setInputValue, setTyping, setGenerating, setActiveTab, setPlan, createConversation, clearMessages, router]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {

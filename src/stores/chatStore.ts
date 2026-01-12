@@ -11,6 +11,7 @@ interface ChatState {
 
   addMessage: (message: Omit<Message, "id" | "timestamp">) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
+  setMessages: (messages: Message[]) => void;
   setTyping: (isTyping: boolean) => void;
   setInputValue: (value: string) => void;
   clearMessages: () => void;
@@ -39,6 +40,8 @@ export const useChatStore = create<ChatState>((set) => ({
         msg.id === id ? { ...msg, ...updates } : msg
       ),
     })),
+
+  setMessages: (messages) => set({ messages }),
 
   setTyping: (isTyping) => set({ isTyping }),
   setInputValue: (inputValue) => set({ inputValue }),

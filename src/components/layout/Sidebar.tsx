@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
+import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -49,6 +50,8 @@ const secondaryNavItems: NavItem[] = [
 ];
 
 export function Sidebar() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const { user, isAuthenticated, logout } = useAuthStore();
   const {
@@ -80,7 +83,12 @@ export function Sidebar() {
       setCurrentConversation(null);
       clearMessages();
       clearPlan();
+      router.push("/");
     }
+  };
+
+  const handleConversationClick = (convId: string) => {
+    router.push(`/task/${convId}`);
   };
 
   const handleToggleStar = (convId: string, e: React.MouseEvent) => {
@@ -323,13 +331,13 @@ export function Sidebar() {
           <div className="space-y-0.5">
             {conversations.slice(0, 5).map((conv) => {
               const isHovered = hoveredTask === conv.id;
-              const isActive = currentConversationId === conv.id;
+              const isActive = pathname === `/task/${conv.id}` || currentConversationId === conv.id;
               return (
                 <div
                   key={conv.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setCurrentConversation(conv.id)}
+                  onClick={() => handleConversationClick(conv.id)}
                   onMouseEnter={() => setHoveredTask(conv.id)}
                   onMouseLeave={() => setHoveredTask(null)}
                   className={cn(
