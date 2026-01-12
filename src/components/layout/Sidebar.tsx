@@ -342,9 +342,10 @@ export function Sidebar() {
                   onMouseEnter={() => setHoveredTask(conv.id)}
                   onMouseLeave={() => setHoveredTask(null)}
                   className={cn(
-                    "group relative flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50",
+                    "group relative flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50 no-underline",
                     isActive && "bg-sage-50"
                   )}
+                  style={{ display: 'flex' }}
                 >
                   {conv.starred ? (
                     <Star className="h-3.5 w-3.5 flex-shrink-0 fill-sage-500 text-sage-500" />
