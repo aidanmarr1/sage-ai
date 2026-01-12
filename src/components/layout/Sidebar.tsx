@@ -325,7 +325,7 @@ export function Sidebar() {
 
       {/* Recent Conversations - Only when expanded */}
       {sidebarOpen && conversations.length > 0 && (
-        <div className="px-3 pb-2">
+        <div className="relative z-10 px-3 pb-2">
           <div className="mb-2 flex items-center justify-between px-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-grey-400">
               Recent
@@ -336,54 +336,57 @@ export function Sidebar() {
               const isHovered = hoveredTask === conv.id;
               const isActive = pathname === `/task/${conv.id}` || currentConversationId === conv.id;
               return (
-                <Link
+                <div
                   key={conv.id}
-                  href={`/task/${conv.id}`}
                   onMouseEnter={() => setHoveredTask(conv.id)}
                   onMouseLeave={() => setHoveredTask(null)}
-                  className={cn(
-                    "group relative flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50 no-underline",
-                    isActive && "bg-sage-50"
-                  )}
-                  style={{ display: 'flex' }}
+                  className="relative"
                 >
-                  {conv.starred ? (
-                    <Star className="h-3.5 w-3.5 flex-shrink-0 fill-sage-500 text-sage-500" />
-                  ) : (
-                    <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-grey-300 transition-colors group-hover:text-grey-500" />
-                  )}
-                  <span className={cn(
-                    "flex-1 truncate text-sm transition-colors group-hover:text-grey-900",
-                    conv.starred || isActive ? "text-grey-800" : "text-grey-600"
-                  )}>
-                    {conv.title}
-                  </span>
+                  <Link
+                    href={`/task/${conv.id}`}
+                    className={cn(
+                      "group relative z-10 flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50 no-underline",
+                      isActive && "bg-sage-50"
+                    )}
+                  >
+                    {conv.starred ? (
+                      <Star className="h-3.5 w-3.5 flex-shrink-0 fill-sage-500 text-sage-500" />
+                    ) : (
+                      <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-grey-300 transition-colors group-hover:text-grey-500" />
+                    )}
+                    <span className={cn(
+                      "flex-1 truncate text-sm transition-colors group-hover:text-grey-900",
+                      conv.starred || isActive ? "text-grey-800" : "text-grey-600"
+                    )}>
+                      {conv.title}
+                    </span>
 
-                  {/* Time or hover actions */}
-                  {isHovered ? (
-                    <div className="flex items-center gap-0.5 animate-fade-in">
-                      <button
-                        onClick={(e) => handleToggleStar(conv.id, e)}
-                        className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded-md transition-all",
-                          conv.starred
-                            ? "text-sage-500 hover:bg-sage-100"
-                            : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
-                        )}
-                      >
-                        <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
-                      </button>
-                      <button
-                        onClick={(e) => handleDelete(conv.id, e)}
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
-                  )}
-                </Link>
+                    {/* Time or hover actions */}
+                    {isHovered ? (
+                      <div className="flex items-center gap-0.5 animate-fade-in">
+                        <button
+                          onClick={(e) => handleToggleStar(conv.id, e)}
+                          className={cn(
+                            "flex h-6 w-6 items-center justify-center rounded-md transition-all",
+                            conv.starred
+                              ? "text-sage-500 hover:bg-sage-100"
+                              : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
+                          )}
+                        >
+                          <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(conv.id, e)}
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
+                    )}
+                  </Link>
+                </div>
               );
             })}
           </div>
