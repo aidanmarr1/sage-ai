@@ -3,6 +3,53 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { nanoid } from "nanoid";
 
+// GET - Fetch messages for a conversation
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getSession();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: conversationId } = await params;
+
+    // Verify conversation ownership
+    const checkResult = await db.execute({
+      sql: "SELECT id FROM conversations WHERE id = ? AND user_id = ?",
+      args: [conversationId, user.id],
+    });
+
+    if (checkResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 }
+      );
+    }
+
+    // Fetch messages
+    const result = await db.execute({
+      sql: `SELECT id, role, content, created_at as createdAt
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY created_at ASC`,
+      args: [conversationId],
+    });
+
+    return NextResponse.json({
+      messages: result.rows,
+    });
+  } catch (error) {
+    console.error("Fetch messages error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch messages" },
+      { status: 500 }
+    );
+  }
+}
+
 // POST - Add a message to conversation
 export async function POST(
   request: NextRequest,
