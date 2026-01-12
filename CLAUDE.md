@@ -59,3 +59,14 @@ Do NOT use:
 3. Subtle shadows and gradients
 4. Smooth transitions and micro-interactions
 5. Consistent rounded corners (rounded-xl, rounded-2xl)
+
+## Deployment
+
+**IMPORTANT: ALWAYS push to git after making changes to deploy to Vercel.**
+
+After completing any code changes:
+1. `git add -A`
+2. `git commit -m "descriptive message"`
+3. `git push`
+
+This triggers automatic deployment to Vercel. Never forget this step!
