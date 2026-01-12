@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { useUIStore } from "@/stores/uiStore";
@@ -92,11 +93,13 @@ export function Sidebar() {
   };
 
   const handleToggleStar = (convId: string, e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     toggleStar(convId);
   };
 
   const handleDelete = (convId: string, e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     deleteConversation(convId);
   };
@@ -333,11 +336,9 @@ export function Sidebar() {
               const isHovered = hoveredTask === conv.id;
               const isActive = pathname === `/task/${conv.id}` || currentConversationId === conv.id;
               return (
-                <div
+                <Link
                   key={conv.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleConversationClick(conv.id)}
+                  href={`/task/${conv.id}`}
                   onMouseEnter={() => setHoveredTask(conv.id)}
                   onMouseLeave={() => setHoveredTask(null)}
                   className={cn(
@@ -381,7 +382,7 @@ export function Sidebar() {
                   ) : (
                     <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
                   )}
-                </div>
+                </Link>
               );
             })}
           </div>
