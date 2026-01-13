@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePlanStore } from "@/stores/planStore";
 import { useAgentStore } from "@/stores/agentStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -21,6 +21,17 @@ export function PlanPanel() {
   const [showConfetti, setShowConfetti] = useState(false);
   const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, setBrowserState, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
+
+  // Memoized calculations
+  const completedCount = useMemo(
+    () => currentPlan?.steps.filter((s) => s.status === "completed").length ?? 0,
+    [currentPlan?.steps]
+  );
+  const totalSteps = currentPlan?.steps.length ?? 0;
+  const progressPercent = useMemo(
+    () => (totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0),
+    [completedCount, totalSteps]
+  );
 
   const executeStep = async (stepIndex: number, stepContent: string, taskContext: string): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -376,20 +387,17 @@ export function PlanPanel() {
           <div className="flex items-center gap-2">
             <Circle className="h-2.5 w-2.5 fill-sage-500 text-sage-500" />
             <span className="text-xs text-grey-500">
-              {currentPlan.steps.filter((s) => s.status === "completed").length} of{" "}
-              {currentPlan.steps.length} completed
+              {completedCount} of {totalSteps} completed
             </span>
           </div>
           <span className="text-xs font-medium text-sage-600">
-            {Math.round((currentPlan.steps.filter((s) => s.status === "completed").length / currentPlan.steps.length) * 100)}%
+            {progressPercent}%
           </span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-grey-100">
           <div
             className="h-full rounded-full bg-gradient-to-r from-sage-400 to-sage-500 transition-all duration-500"
-            style={{
-              width: `${(currentPlan.steps.filter((s) => s.status === "completed").length / currentPlan.steps.length) * 100}%`,
-            }}
+            style={{ width: `${progressPercent}%` }}
           />
         </div>
       </div>

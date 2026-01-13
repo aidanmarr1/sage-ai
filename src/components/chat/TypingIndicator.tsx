@@ -1,7 +1,7 @@
 "use client";
 
+import { memo, useState, useEffect } from "react";
 import Image from "next/image";
-import { useState, useEffect } from "react";
 
 const thinkingPhrases = [
   "Thinking...",
@@ -10,7 +10,7 @@ const thinkingPhrases = [
   "Working on it...",
 ];
 
-export function TypingIndicator() {
+export const TypingIndicator = memo(function TypingIndicator() {
   const [phraseIndex, setPhraseIndex] = useState(0);
 
   useEffect(() => {
@@ -63,4 +63,6 @@ export function TypingIndicator() {
       </div>
     </div>
   );
-}
+});
+
+TypingIndicator.displayName = "TypingIndicator";

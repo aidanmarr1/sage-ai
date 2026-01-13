@@ -1,11 +1,11 @@
 "use client";
 
+import { memo, useState } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
 import type { Message as MessageType } from "@/types";
 import { User, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
 
 interface MessageProps {
   message: MessageType;
@@ -13,7 +13,7 @@ interface MessageProps {
   isLast?: boolean;
 }
 
-export function Message({ message, isFirst = true, isLast = true }: MessageProps) {
+export const Message = memo(function Message({ message, isFirst = true, isLast = true }: MessageProps) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [reaction, setReaction] = useState<"up" | "down" | null>(null);
@@ -188,4 +188,6 @@ export function Message({ message, isFirst = true, isLast = true }: MessageProps
       </div>
     </div>
   );
-}
+});
+
+Message.displayName = "Message";
