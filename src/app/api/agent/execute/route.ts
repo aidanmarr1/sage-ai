@@ -278,7 +278,7 @@ async function browsePage(
       const errorText = await response.text();
       console.error("Steel scrape failed:", response.status, errorText);
       // Still return with screenshot if we have it
-      return screenshot ? { content: "", screenshot } : null;
+      return screenshot ? { content: "", screenshot: screenshot || undefined } : null;
     }
 
     const data = await response.json();
@@ -287,7 +287,7 @@ async function browsePage(
     return {
       content: data.content || data.markdown || "",
       title: data.title || data.metadata?.title,
-      screenshot,
+      screenshot: screenshot || undefined,
     };
   } catch (error) {
     console.error("Steel browse error:", error);
