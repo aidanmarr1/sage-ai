@@ -28,6 +28,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useChatStore } from "@/stores/chatStore";
 import { usePlanStore } from "@/stores/planStore";
+import { useSearchStore } from "@/stores/searchStore";
 import { formatDistanceToNow } from "date-fns";
 
 type NavItem = {
@@ -64,6 +65,7 @@ export function Sidebar() {
   } = useConversationStore();
   const { clearMessages } = useChatStore();
   const { clearPlan } = usePlanStore();
+  const { openSearch } = useSearchStore();
   const [activeNav, setActiveNav] = useState("tasks");
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
@@ -294,6 +296,7 @@ export function Sidebar() {
       {/* Search Bar */}
       <div className={cn("relative", sidebarOpen ? "px-3 pb-3" : "px-2 pb-2")}>
         <button
+          onClick={openSearch}
           onMouseEnter={() => !sidebarOpen && setHoveredItem("search")}
           onMouseLeave={() => setHoveredItem(null)}
           className={cn(

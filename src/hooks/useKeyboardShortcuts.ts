@@ -6,6 +6,7 @@ import { useUIStore } from "@/stores/uiStore";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useChatStore } from "@/stores/chatStore";
 import { usePlanStore } from "@/stores/planStore";
+import { useSearchStore } from "@/stores/searchStore";
 
 export function useKeyboardShortcuts() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export function useKeyboardShortcuts() {
   const { setCurrentConversation } = useConversationStore();
   const { clearMessages } = useChatStore();
   const { clearPlan } = usePlanStore();
+  const { toggleSearch } = useSearchStore();
 
   const handleNewTask = useCallback(() => {
     setCurrentConversation(null);
@@ -49,11 +51,10 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Cmd/Ctrl + K: Focus Search (TODO: implement search modal)
+      // Cmd/Ctrl + K: Toggle Search Modal
       if (isMeta && e.key === "k") {
         e.preventDefault();
-        // For now, just log - will implement search modal later
-        console.log("Search triggered");
+        toggleSearch();
         return;
       }
 
@@ -74,5 +75,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNewTask, toggleSidebar, router]);
+  }, [handleNewTask, toggleSidebar, toggleSearch, router]);
 }
