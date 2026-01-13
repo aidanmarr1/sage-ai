@@ -1,27 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useAgentStore } from "@/stores/agentStore";
 import { Monitor, Search, Globe, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export function ComputerPanel() {
   const { isExecuting, latestSearchResults, actions, browserState } = useAgentStore();
-  const openedSessionRef = useRef<string | null>(null);
-
-  // Auto-open live view when browser session starts
-  useEffect(() => {
-    if (browserState.liveViewUrl && browserState.sessionId && browserState.sessionId !== openedSessionRef.current) {
-      // Open live view in new tab automatically
-      window.open(browserState.liveViewUrl, "_blank", "noopener,noreferrer");
-      openedSessionRef.current = browserState.sessionId;
-    }
-
-    // Reset when session ends
-    if (!browserState.isActive) {
-      openedSessionRef.current = null;
-    }
-  }, [browserState.liveViewUrl, browserState.sessionId, browserState.isActive]);
 
   // Get the most recent search action
   const recentSearchAction = [...actions].reverse().find(
@@ -91,8 +75,8 @@ export function ComputerPanel() {
     );
   }
 
-  // Browser view - show when browsing is active
-  if (browserState.isActive || isBrowsing) {
+  // Browser view - show when browsing is active or we have a screenshot
+  if (browserState.isActive || browserState.screenshot || isBrowsing) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-white">
         {/* Browser Header */}
@@ -108,46 +92,54 @@ export function ComputerPanel() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-sage-500" />
-            </span>
-            Live
-          </div>
+          {browserState.isActive && (
+            <div className="flex items-center gap-2 rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-sage-500" />
+              </span>
+              Live
+            </div>
+          )}
         </div>
 
-        {/* Browser Content - just status */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-grey-50 to-white p-8">
-          <div className="relative mb-6">
-            <div className="absolute -inset-4 rounded-3xl bg-sage-100/50 blur-xl animate-pulse" />
-            <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-sage-500 to-sage-600 shadow-xl shadow-sage-500/25">
-              <Globe className="h-10 w-10 text-white" />
+        {/* Browser Content - Live screenshot stream */}
+        <div className="flex-1 overflow-hidden bg-grey-900">
+          {browserState.screenshot ? (
+            <img
+              src={`data:image/png;base64,${browserState.screenshot}`}
+              alt="Live browser view"
+              className="h-full w-full object-contain"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-grey-400 mb-4" />
+              <p className="text-sm text-grey-400">Loading browser...</p>
             </div>
-          </div>
-          <h3 className="font-serif text-xl font-semibold text-grey-900 mb-2">
-            Browsing in Progress
-          </h3>
-          <p className="text-sm text-grey-500 text-center max-w-xs mb-1">
-            A live browser window has opened in a new tab.
-          </p>
-          <p className="text-sm text-grey-500 text-center max-w-xs">
-            The agent is extracting content from the page.
-          </p>
+          )}
         </div>
 
         {/* Footer */}
         <div className="relative flex h-12 items-center justify-between border-t border-grey-200 bg-grey-50/50 px-4">
           <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-sage-200 to-transparent" />
           <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sage-500" />
-            </span>
-            <span className="text-xs font-medium text-sage-600">Browsing</span>
+            {browserState.isActive ? (
+              <>
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sage-500" />
+                </span>
+                <span className="text-xs font-medium text-sage-600">Live</span>
+              </>
+            ) : (
+              <>
+                <div className="h-2.5 w-2.5 rounded-full bg-grey-400" />
+                <span className="text-xs font-medium text-grey-500">Finished</span>
+              </>
+            )}
           </div>
           <span className="text-xs text-grey-500">
-            Live view opened
+            {browserState.isActive ? "Streaming..." : "Screenshot"}
           </span>
         </div>
       </div>

@@ -173,6 +173,7 @@ interface SteelSession {
 interface SteelScrapeResult {
   content: string;
   title?: string;
+  screenshot?: string;
 }
 
 let currentSteelSession: SteelSession | null = null;
@@ -211,11 +212,50 @@ async function createSteelSession(): Promise<SteelSession | null> {
   }
 }
 
-async function browsePage(url: string, sessionId?: string): Promise<SteelScrapeResult | null> {
+async function takeScreenshot(sessionId: string): Promise<string | null> {
+  if (!STEEL_API_KEY) return null;
+
+  try {
+    const response = await fetch(`https://api.steel.dev/v1/sessions/${sessionId}/screenshot`, {
+      method: "GET",
+      headers: {
+        "Steel-Api-Key": STEEL_API_KEY,
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    return data.screenshot || null;
+  } catch {
+    return null;
+  }
+}
+
+async function browsePage(
+  url: string,
+  sessionId: string | undefined,
+  onScreenshot: (screenshot: string) => void
+): Promise<SteelScrapeResult | null> {
   if (!STEEL_API_KEY) {
     console.error("STEEL_API_KEY not configured");
     return null;
   }
+
+  // Start screenshot streaming in background
+  let stopScreenshots = false;
+  const screenshotLoop = async () => {
+    while (!stopScreenshots && sessionId) {
+      const screenshot = await takeScreenshot(sessionId);
+      if (screenshot && !stopScreenshots) {
+        onScreenshot(screenshot);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800)); // Update every 800ms
+    }
+  };
+
+  // Start the screenshot loop
+  const screenshotPromise = screenshotLoop();
 
   try {
     const response = await fetch("https://api.steel.dev/v1/scrape", {
@@ -231,17 +271,30 @@ async function browsePage(url: string, sessionId?: string): Promise<SteelScrapeR
       }),
     });
 
+    // Stop screenshot loop
+    stopScreenshots = true;
+
     if (!response.ok) {
       console.error("Steel scrape failed:", response.status);
       return null;
     }
 
     const data = await response.json();
+
+    // Take one final screenshot
+    if (sessionId) {
+      const finalScreenshot = await takeScreenshot(sessionId);
+      if (finalScreenshot) {
+        onScreenshot(finalScreenshot);
+      }
+    }
+
     return {
       content: data.content || "",
       title: data.title,
     };
   } catch (error) {
+    stopScreenshots = true;
     console.error("Steel browse error:", error);
     return null;
   }
@@ -453,7 +506,7 @@ Execute this step by searching for relevant information and documenting your fin
                   if (!currentSteelSession) {
                     currentSteelSession = await createSteelSession();
                     if (currentSteelSession) {
-                      // Send browser session info for live view
+                      // Send browser session info
                       sendEvent("browserState", {
                         sessionId: currentSteelSession.id,
                         liveViewUrl: currentSteelSession.sessionViewerUrl,
@@ -461,9 +514,27 @@ Execute this step by searching for relevant information and documenting your fin
                         isActive: true,
                       });
                     }
+                  } else {
+                    // Update current URL
+                    sendEvent("browserState", {
+                      currentUrl: url,
+                      isActive: true,
+                    });
                   }
 
-                  const browseResult = await browsePage(url, currentSteelSession?.id);
+                  // Browse page with live screenshot streaming
+                  const browseResult = await browsePage(
+                    url,
+                    currentSteelSession?.id,
+                    (screenshot) => {
+                      // Stream each screenshot to the frontend
+                      sendEvent("browserState", {
+                        screenshot,
+                        currentUrl: url,
+                        isActive: true,
+                      });
+                    }
+                  );
 
                   if (browseResult) {
                     // Send browsing complete
