@@ -1,7 +1,7 @@
 "use client";
 
 import { useAgentStore } from "@/stores/agentStore";
-import { Monitor, Search, Globe, ExternalLink, Loader2 } from "lucide-react";
+import { Monitor, Search, Globe, ExternalLink, Loader2, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 export function ComputerPanel() {
@@ -92,7 +92,18 @@ export function ComputerPanel() {
               </p>
             )}
           </div>
-          {isBrowsing && (
+          {browserState.liveViewUrl && browserState.isActive && (
+            <a
+              href={browserState.liveViewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-full bg-sage-500 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-sage-600 transition-colors"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+              Live View
+            </a>
+          )}
+          {isBrowsing && !browserState.liveViewUrl && (
             <div className="flex items-center gap-2 rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Browsing...
@@ -111,11 +122,31 @@ export function ComputerPanel() {
                 className="w-full rounded-lg shadow-lg"
               />
             </div>
+          ) : browserState.liveViewUrl && browserState.isActive ? (
+            // Live view available - show prompt to open
+            <div className="flex flex-col items-center justify-center h-full text-center p-8">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sage-100 mb-4">
+                <Globe className="h-8 w-8 text-sage-600" />
+              </div>
+              <h3 className="font-medium text-grey-900 mb-2">Live Browser Session</h3>
+              <p className="text-sm text-grey-500 mb-4 max-w-xs">
+                Click the button below to watch the agent browse in real-time in a new tab.
+              </p>
+              <a
+                href={browserState.liveViewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-full bg-sage-500 px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-sage-600 transition-colors"
+              >
+                <Maximize2 className="h-4 w-4" />
+                Open Live View
+              </a>
+            </div>
           ) : isBrowsing ? (
             // Loading state
             <div className="flex flex-col items-center justify-center h-full text-center">
               <Loader2 className="h-8 w-8 animate-spin text-sage-500 mb-4" />
-              <p className="text-sm text-grey-500">Loading page...</p>
+              <p className="text-sm text-grey-500">Starting browser session...</p>
             </div>
           ) : (
             // Waiting state
