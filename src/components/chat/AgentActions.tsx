@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Loader2,
   Sparkles,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -27,6 +28,8 @@ function ActionIcon({ type, status }: { type: AgentAction["type"]; status: Agent
       return <Search className={cn(baseClass, "text-sage-500")} />;
     case "search_complete":
       return <CheckCircle2 className={cn(baseClass, "text-sage-500")} />;
+    case "browsing":
+      return <Globe className={cn(baseClass, "text-sage-600")} />;
     case "writing":
       return <FileText className={cn(baseClass, "text-sage-500")} />;
     case "synthesizing":

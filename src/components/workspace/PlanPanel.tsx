@@ -16,7 +16,7 @@ import {
 
 export function PlanPanel() {
   const { currentPlan, isGenerating, updateStepStatus } = usePlanStore();
-  const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, clearActions, reset } = useAgentStore();
+  const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, setBrowserState, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
 
   const executeStep = async (stepIndex: number, stepContent: string, taskContext: string): Promise<boolean> => {
@@ -63,6 +63,9 @@ export function PlanPanel() {
                 } else if (event.type === "searchResults") {
                   // Update search results for ComputerPanel
                   setLatestSearchResults(event.data);
+                } else if (event.type === "browserState") {
+                  // Update browser state for ComputerPanel
+                  setBrowserState(event.data);
                 } else if (event.type === "findings") {
                   // Append findings
                   appendFindings(event.data);

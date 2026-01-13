@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
+const STEEL_API_KEY = process.env.STEEL_API_KEY;
 
 // Tool definitions for the agent
 const TOOLS = [
@@ -21,6 +22,23 @@ const TOOLS = [
           },
         },
         required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "browse_website",
+      description: "Browse a website to extract detailed content. Use this when a search result looks particularly promising and you need more detailed information than the snippet provides. Don't browse every result - only the most relevant 1-2 per step.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The URL to browse and extract content from",
+          },
+        },
+        required: ["url"],
       },
     },
   },
@@ -52,11 +70,15 @@ const SYSTEM_PROMPT = `You are Sage, an AI agent executing a research task step 
 For each step you receive, you should:
 1. Analyze what information is needed to complete this step
 2. Use web_search to find relevant, current information
-3. Use write_findings to document the key insights you discover
-4. Be thorough but concise in your findings
+3. Use browse_website when a search result needs deeper investigation
+4. Use write_findings to document the key insights you discover
+5. Be thorough but concise in your findings
 
 Guidelines:
 - Always search for real, current information before writing findings
+- Use browse_website when you find a promising search result that needs deeper exploration
+  - Only browse 1-2 of the most relevant URLs per step (not every result)
+  - Browse when snippets aren't enough and you need full article content
 - Write findings in clear, organized markdown format
 - Include specific facts, numbers, and sources when available
 - Focus on actionable, useful information
@@ -139,6 +161,107 @@ async function executeSearch(query: string): Promise<{ results: SearchResult[] }
   } catch (error) {
     console.error("Search error:", error);
     return { results: [] };
+  }
+}
+
+// Steel API - Browser session management
+interface SteelSession {
+  id: string;
+  sessionViewerUrl: string;
+}
+
+interface SteelScrapeResult {
+  content: string;
+  screenshot?: string;
+  title?: string;
+}
+
+let currentSteelSession: SteelSession | null = null;
+
+async function createSteelSession(): Promise<SteelSession | null> {
+  if (!STEEL_API_KEY) {
+    console.error("STEEL_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://api.steel.dev/v1/sessions", {
+      method: "POST",
+      headers: {
+        "Steel-Api-Key": STEEL_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        timeout: 300000, // 5 minute session
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Steel session creation failed:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      id: data.id,
+      sessionViewerUrl: data.sessionViewerUrl,
+    };
+  } catch (error) {
+    console.error("Steel session error:", error);
+    return null;
+  }
+}
+
+async function browsePage(url: string, sessionId?: string): Promise<SteelScrapeResult | null> {
+  if (!STEEL_API_KEY) {
+    console.error("STEEL_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://api.steel.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Steel-Api-Key": STEEL_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        sessionId,
+        format: "markdown",
+        screenshot: true,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Steel scrape failed:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      content: data.content || "",
+      screenshot: data.screenshot,
+      title: data.title,
+    };
+  } catch (error) {
+    console.error("Steel browse error:", error);
+    return null;
+  }
+}
+
+async function releaseSteelSession(sessionId: string): Promise<void> {
+  if (!STEEL_API_KEY) return;
+
+  try {
+    await fetch(`https://api.steel.dev/v1/sessions/${sessionId}`, {
+      method: "DELETE",
+      headers: {
+        "Steel-Api-Key": STEEL_API_KEY,
+      },
+    });
+  } catch (error) {
+    console.error("Steel session release error:", error);
   }
 }
 
@@ -308,6 +431,97 @@ Execute this step by searching for relevant information and documenting your fin
                     content: "Search failed. Please try a different query.",
                   });
                 }
+              } else if (functionName === "browse_website") {
+                const url = args.url || "";
+
+                // Get display URL (truncated)
+                let displayUrl = url;
+                try {
+                  const urlObj = new URL(url);
+                  displayUrl = urlObj.hostname + urlObj.pathname.substring(0, 30);
+                  if (urlObj.pathname.length > 30) displayUrl += "...";
+                } catch {
+                  displayUrl = url.substring(0, 40) + (url.length > 40 ? "..." : "");
+                }
+
+                // Send browsing action (running)
+                sendEvent("action", {
+                  type: "browsing",
+                  label: `Browsing ${displayUrl}`,
+                  status: "running",
+                });
+
+                try {
+                  // Create session if we don't have one
+                  if (!currentSteelSession) {
+                    currentSteelSession = await createSteelSession();
+                    if (currentSteelSession) {
+                      // Send browser session info for live view
+                      sendEvent("browserState", {
+                        sessionId: currentSteelSession.id,
+                        liveViewUrl: currentSteelSession.sessionViewerUrl,
+                        currentUrl: url,
+                        isActive: true,
+                      });
+                    }
+                  }
+
+                  const browseResult = await browsePage(url, currentSteelSession?.id);
+
+                  if (browseResult) {
+                    // Send screenshot update
+                    if (browseResult.screenshot) {
+                      sendEvent("browserState", {
+                        currentUrl: url,
+                        screenshot: browseResult.screenshot,
+                        isActive: true,
+                      });
+                    }
+
+                    // Send browsing complete
+                    sendEvent("action", {
+                      type: "browsing",
+                      label: `Browsing ${displayUrl}`,
+                      status: "completed",
+                    });
+
+                    // Truncate content for LLM if too long
+                    let pageContent = browseResult.content;
+                    if (pageContent.length > 8000) {
+                      pageContent = pageContent.substring(0, 8000) + "\n\n[Content truncated...]";
+                    }
+
+                    messages.push({
+                      role: "tool",
+                      tool_call_id: toolCall.id,
+                      content: `# ${browseResult.title || "Page Content"}\nURL: ${url}\n\n${pageContent}`,
+                    });
+                  } else {
+                    sendEvent("action", {
+                      type: "error",
+                      label: "Failed to browse page",
+                      status: "error",
+                    });
+
+                    messages.push({
+                      role: "tool",
+                      tool_call_id: toolCall.id,
+                      content: "Failed to browse this page. Try a different URL or use search results instead.",
+                    });
+                  }
+                } catch (error) {
+                  sendEvent("action", {
+                    type: "error",
+                    label: "Browse failed",
+                    status: "error",
+                  });
+
+                  messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    content: "Failed to browse page. Please try a different URL.",
+                  });
+                }
               } else if (functionName === "write_findings") {
                 const heading = args.heading || "Findings";
                 const content = args.content || "";
@@ -349,6 +563,15 @@ Execute this step by searching for relevant information and documenting your fin
           }
         }
 
+        // Release Steel session if we created one
+        if (currentSteelSession) {
+          await releaseSteelSession(currentSteelSession.id);
+          sendEvent("browserState", {
+            isActive: false,
+          });
+          currentSteelSession = null;
+        }
+
         // Send step complete action
         sendEvent("action", {
           type: "complete",
@@ -364,6 +587,13 @@ Execute this step by searching for relevant information and documenting your fin
 
       } catch (error) {
         console.error("Agent execute error:", error);
+
+        // Clean up Steel session on error
+        if (currentSteelSession) {
+          await releaseSteelSession(currentSteelSession.id);
+          currentSteelSession = null;
+        }
+
         sendEvent("action", {
           type: "error",
           label: "Execution failed",

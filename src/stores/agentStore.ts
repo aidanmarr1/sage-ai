@@ -8,9 +8,17 @@ export interface SearchResult {
   favicon?: string;
 }
 
+export interface BrowserState {
+  sessionId: string | null;
+  liveViewUrl: string | null;
+  currentUrl: string | null;
+  screenshot: string | null;
+  isActive: boolean;
+}
+
 export interface AgentAction {
   id: string;
-  type: "thinking" | "searching" | "search_complete" | "writing" | "synthesizing" | "complete" | "error";
+  type: "thinking" | "searching" | "search_complete" | "browsing" | "writing" | "synthesizing" | "complete" | "error";
   label: string;
   status: "running" | "completed" | "error";
   detail?: string;
@@ -34,6 +42,7 @@ interface AgentState {
   finalReport: string;
   stepContents: string[];
   latestSearchResults: SearchResult[];
+  browserState: BrowserState;
 
   // Actions
   setExecuting: (executing: boolean) => void;
@@ -49,9 +58,19 @@ interface AgentState {
   setFinalReport: (report: string) => void;
   appendFinalReport: (content: string) => void;
   setLatestSearchResults: (results: SearchResult[]) => void;
+  setBrowserState: (state: Partial<BrowserState>) => void;
+  resetBrowserState: () => void;
   clearActions: () => void;
   reset: () => void;
 }
+
+const initialBrowserState: BrowserState = {
+  sessionId: null,
+  liveViewUrl: null,
+  currentUrl: null,
+  screenshot: null,
+  isActive: false,
+};
 
 export const useAgentStore = create<AgentState>((set, get) => ({
   isExecuting: false,
@@ -61,6 +80,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   finalReport: "",
   stepContents: [],
   latestSearchResults: [],
+  browserState: initialBrowserState,
 
   setExecuting: (executing) => set({ isExecuting: executing }),
 
@@ -158,6 +178,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   setLatestSearchResults: (results) => set({ latestSearchResults: results }),
 
+  setBrowserState: (state) => {
+    set((prev) => ({
+      browserState: { ...prev.browserState, ...state },
+    }));
+  },
+
+  resetBrowserState: () => set({ browserState: initialBrowserState }),
+
   clearActions: () => set({ actions: [] }),
 
   reset: () =>
@@ -169,5 +197,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       finalReport: "",
       stepContents: [],
       latestSearchResults: [],
+      browserState: initialBrowserState,
     }),
 }));
