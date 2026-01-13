@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePlanStore } from "@/stores/planStore";
 import { useAgentStore } from "@/stores/agentStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -13,9 +14,11 @@ import {
   Play,
   Pause,
 } from "lucide-react";
+import { Confetti } from "@/components/ui";
 
 export function PlanPanel() {
   const { currentPlan, isGenerating, updateStepStatus } = usePlanStore();
+  const [showConfetti, setShowConfetti] = useState(false);
   const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, setBrowserState, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
 
@@ -193,6 +196,10 @@ export function PlanPanel() {
       // Switch to findings tab when done
       setActiveTab("findings");
 
+      // Show confetti on successful completion
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
+
     } finally {
       setExecuting(false);
     }
@@ -263,6 +270,9 @@ export function PlanPanel() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
+      {/* Confetti celebration */}
+      <Confetti isActive={showConfetti} />
+
       {/* Header */}
       <div className="relative flex items-center justify-between border-b border-grey-100 bg-gradient-to-r from-sage-50 to-white px-6 py-4">
         <div className="flex items-center gap-3">

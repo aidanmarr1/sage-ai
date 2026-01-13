@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { EB_Garamond, Nunito_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/auth";
+import { ToastProvider } from "@/components/ui";
 import "./globals.css";
 
 const ebGaramond = EB_Garamond({
@@ -32,7 +33,9 @@ export default function RootLayout({
       <body
         className={`${ebGaramond.variable} ${nunitoSans.variable} font-sans antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );
