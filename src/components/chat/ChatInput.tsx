@@ -101,7 +101,30 @@ export function ChatInput() {
     }
 
     try {
-      // Step 1: Classify the message to determine if it's a task or greeting
+      // Step 1: ALWAYS create conversation first (if authenticated and none exists)
+      let convId = currentConversationId;
+      if (isAuthenticated && !convId) {
+        const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
+        const conv = await createConversation(title);
+        if (conv) {
+          convId = conv.id;
+          clearMessages();
+          addMessage({
+            role: "user",
+            content: userMessage,
+            status: "sent",
+            images: attachedImages.length > 0 ? attachedImages : undefined,
+          });
+          router.push(`/task/${conv.id}`);
+        }
+      }
+
+      // Save user message to database
+      if (convId) {
+        await saveMessage(convId, "user", userMessage);
+      }
+
+      // Step 2: Classify to determine response type (actionable task vs conversational)
       const classifyResponse = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,95 +143,42 @@ export function ChatInput() {
 
       const classifyData = await classifyResponse.json();
       const classifyResult = (classifyData.content || "").toLowerCase().trim();
-      console.log("Classification result:", classifyResult);
-      // More lenient check - LLM might return extra text
-      const isTask = classifyResult.includes("task") && !classifyResult.includes("greeting");
-      console.log("Is task:", isTask);
+      const isActionable = classifyResult.includes("task") && !classifyResult.includes("greeting");
 
-      // If it's just a greeting, respond conversationally without creating a task
-      if (!isTask) {
-        const greetingResponse = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: userMessage }],
-            type: "greeting",
-          }),
-        });
-
-        if (!greetingResponse.ok) {
-          throw new Error("Failed to get response");
-        }
-
-        const greetingData = await greetingResponse.json();
-        setTyping(false);
-        addMessage({
-          role: "assistant",
-          content: greetingData.content,
-          status: "sent",
-        });
-        return;
-      }
-
-      // It's a task - create conversation if authenticated and none exists
-      let convId = currentConversationId;
-      console.log("Task detected. isAuthenticated:", isAuthenticated, "currentConvId:", convId);
-      if (isAuthenticated && !convId) {
-        const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
-        console.log("Creating conversation with title:", title);
-        const conv = await createConversation(title);
-        console.log("Created conversation:", conv);
-        if (conv) {
-          convId = conv.id;
-          clearMessages(); // Clear local messages for new conversation
-          addMessage({
-            role: "user",
-            content: userMessage,
-            status: "sent",
-            images: attachedImages.length > 0 ? attachedImages : undefined,
-          });
-          // Navigate to the new task URL
-          router.push(`/task/${conv.id}`);
-        }
-      }
-
-      // Save user message to database
-      if (convId) {
-        await saveMessage(convId, "user", userMessage);
-      }
-
-      // Step 2: Get acknowledgement
-      const ackResponse = await fetch("/api/chat", {
+      // Step 3: Get appropriate response
+      const responseType = isActionable ? "acknowledge" : "greeting";
+      const responseRequest = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: userMessage }],
-          type: "acknowledge",
+          type: responseType,
         }),
       });
 
-      if (!ackResponse.ok) {
-        if (ackResponse.status === 401) {
-          throw new Error("Please sign in to use Sage.");
-        }
-        throw new Error("Failed to get acknowledgement");
+      if (!responseRequest.ok) {
+        throw new Error("Failed to get response");
       }
 
-      const ackData = await ackResponse.json();
-
+      const responseData = await responseRequest.json();
       setTyping(false);
       addMessage({
         role: "assistant",
-        content: ackData.content,
+        content: responseData.content,
         status: "sent",
       });
 
       // Save assistant message to database
       if (convId) {
-        await saveMessage(convId, "assistant", ackData.content);
+        await saveMessage(convId, "assistant", responseData.content);
       }
 
-      // Step 3: Generate plan
+      // Step 4: If actionable, generate plan. Otherwise we're done.
+      if (!isActionable) {
+        return;
+      }
+
+      // Step 5: Generate plan for actionable tasks
       setGenerating(true);
       setActiveTab("plan");
 
