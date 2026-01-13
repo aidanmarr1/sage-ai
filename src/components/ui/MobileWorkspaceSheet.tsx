@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useCallback } from "react";
 import { X, ChevronUp, Monitor, ClipboardList, FileText, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -21,12 +22,35 @@ export function MobileWorkspaceSheet({
   const { activeTab, setActiveTab } = useWorkspaceStore();
   const { currentPlan } = usePlanStore();
   const { findings } = useAgentStore();
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragStartY = useRef(0);
+  const isDragging = useRef(false);
 
   const tabs: { id: WorkspaceTab; label: string; icon: LucideIcon; badge: string | null }[] = [
     { id: "computer", label: "Computer", icon: Monitor, badge: null },
     { id: "plan", label: "Plan", icon: ClipboardList, badge: currentPlan ? "1" : null },
     { id: "findings", label: "Findings", icon: FileText, badge: findings.length > 0 ? findings.length.toString() : null },
   ];
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY;
+    isDragging.current = true;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const currentY = e.touches[0].clientY;
+    const offset = Math.max(0, currentY - dragStartY.current);
+    setDragOffset(offset);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    isDragging.current = false;
+    if (dragOffset > 100) {
+      onClose();
+    }
+    setDragOffset(0);
+  }, [dragOffset, onClose]);
 
   if (!isOpen) return null;
 
@@ -35,14 +59,24 @@ export function MobileWorkspaceSheet({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-grey-900/50 animate-fade-in"
+        style={{ opacity: Math.max(0.1, 1 - dragOffset / 300) }}
         onClick={onClose}
       />
 
       {/* Sheet */}
-      <div className="absolute bottom-0 left-0 right-0 animate-slide-up rounded-t-3xl bg-white shadow-2xl">
+      <div
+        className="absolute bottom-0 left-0 right-0 animate-slide-in-bottom rounded-t-3xl bg-white shadow-2xl safe-area-bottom"
+        style={{
+          transform: `translateY(${dragOffset}px)`,
+          transition: isDragging.current ? 'none' : 'transform 0.3s ease-out'
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Handle */}
-        <div className="flex items-center justify-center pt-3 pb-2">
-          <div className="h-1 w-10 rounded-full bg-grey-300" />
+        <div className="flex items-center justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
+          <div className="h-1.5 w-12 rounded-full bg-grey-300" />
         </div>
 
         {/* Header */}

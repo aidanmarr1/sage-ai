@@ -403,7 +403,8 @@ export function ChatInput() {
 
         {/* Bottom bar */}
         <div className="flex items-center justify-between border-t border-grey-100 bg-grey-50/50 px-4 py-2">
-          <div className="flex items-center gap-3 text-xs text-grey-400">
+          {/* Keyboard hints - hidden on mobile */}
+          <div className="hidden md:flex items-center gap-3 text-xs text-grey-400">
             <span className="flex items-center gap-1">
               <kbd className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] text-grey-500 shadow-sm ring-1 ring-grey-200">
                 Enter
@@ -417,6 +418,11 @@ export function ChatInput() {
               <span>for new line</span>
             </span>
           </div>
+
+          {/* Mobile helper text */}
+          <span className="md:hidden text-xs text-grey-400">
+            Tap send or press enter
+          </span>
 
           {characterCount > 0 && (
             <span
@@ -435,8 +441,8 @@ export function ChatInput() {
         </div>
       </div>
 
-      {/* AI hint */}
-      <p className="mt-3 text-center text-xs text-grey-400">
+      {/* AI hint - hidden on mobile */}
+      <p className="mt-3 hidden md:block text-center text-xs text-grey-400">
         Sage may make mistakes. Please verify important information.
       </p>
     </div>

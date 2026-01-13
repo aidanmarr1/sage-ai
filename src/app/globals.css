@@ -354,3 +354,108 @@ body {
   animation: cursor-blink 1s step-end infinite;
 }
 
+/* Bounce animation for notifications */
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.4s ease-out;
+}
+
+/* Slide-in from bottom for sheets */
+@keyframes slide-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in-bottom {
+  animation: slide-in-bottom 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Rubber band effect for pull-to-refresh */
+@keyframes rubber-band {
+  0% {
+    transform: scaleX(1) scaleY(1);
+  }
+  30% {
+    transform: scaleX(1.15) scaleY(0.9);
+  }
+  60% {
+    transform: scaleX(0.95) scaleY(1.05);
+  }
+  100% {
+    transform: scaleX(1) scaleY(1);
+  }
+}
+
+.animate-rubber-band {
+  animation: rubber-band 0.5s ease-out;
+}
+
+/* Ripple effect for touch feedback */
+.touch-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.touch-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(107, 135, 107, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s, height 0.4s;
+}
+
+.touch-ripple:active::after {
+  width: 200px;
+  height: 200px;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Gradient text effect */
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-sage-600), var(--color-sage-400));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
