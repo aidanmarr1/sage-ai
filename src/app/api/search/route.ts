@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
-// DuckDuckGo HTML search endpoint (free, no API key needed)
-const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
+// List of public SearXNG instances (free, no API key needed)
+const SEARXNG_INSTANCES = [
+  "https://search.sapti.me",
+  "https://searx.be",
+  "https://search.bus-hit.me",
+  "https://searx.tiekoetter.com",
+  "https://search.ononoki.org",
+];
 
 export interface SearchResult {
   title: string;
@@ -15,44 +21,28 @@ export interface SearchResponse {
   query: string;
 }
 
-// Parse DuckDuckGo HTML response
-function parseDuckDuckGoResults(html: string): SearchResult[] {
-  const results: SearchResult[] = [];
+async function trySearchInstance(instance: string, query: string): Promise<SearchResult[]> {
+  const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=general`;
 
-  // Match result blocks
-  const resultRegex = /<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+  const response = await fetch(url, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
+    },
+    signal: AbortSignal.timeout(8000), // 8 second timeout
+  });
 
-  let match;
-  while ((match = resultRegex.exec(html)) !== null && results.length < 6) {
-    const url = match[1];
-    const title = match[2].trim();
-    const snippet = match[3]
-      .replace(/<\/?b>/g, "") // Remove bold tags
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&#x27;/g, "'")
-      .trim();
-
-    if (url && title && !url.includes("duckduckgo.com")) {
-      results.push({ title, url, content: snippet });
-    }
+  if (!response.ok) {
+    throw new Error(`Instance ${instance} returned ${response.status}`);
   }
 
-  // Fallback: try simpler pattern if above didn't work
-  if (results.length === 0) {
-    const simpleRegex = /<a class="result__url"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<a class="result__a"[^>]*>([^<]+)<\/a>/g;
-    while ((match = simpleRegex.exec(html)) !== null && results.length < 6) {
-      const url = match[1];
-      const title = match[2].trim();
-      if (url && title) {
-        results.push({ title, url, content: "" });
-      }
-    }
-  }
+  const data = await response.json();
 
-  return results;
+  return (data.results || []).slice(0, 6).map((r: { title?: string; url?: string; content?: string }) => ({
+    title: r.title || "",
+    url: r.url || "",
+    content: r.content || "",
+  }));
 }
 
 export async function POST(request: NextRequest) {
@@ -76,26 +66,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call DuckDuckGo HTML search (free, no API key)
-    const response = await fetch(DUCKDUCKGO_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
-      },
-      body: new URLSearchParams({ q: query }),
-    });
+    // Try each SearXNG instance until one works
+    let results: SearchResult[] = [];
+    let lastError: Error | null = null;
 
-    if (!response.ok) {
-      console.error("DuckDuckGo search error:", response.status);
-      return NextResponse.json(
-        { error: "Search failed" },
-        { status: response.status }
-      );
+    for (const instance of SEARXNG_INSTANCES) {
+      try {
+        results = await trySearchInstance(instance, query);
+        if (results.length > 0) {
+          break; // Found results, stop trying
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.log(`SearXNG instance ${instance} failed, trying next...`);
+        continue;
+      }
     }
 
-    const html = await response.text();
-    const results = parseDuckDuckGoResults(html);
+    if (results.length === 0 && lastError) {
+      console.error("All SearXNG instances failed:", lastError.message);
+    }
 
     return NextResponse.json({
       results,

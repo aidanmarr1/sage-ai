@@ -98,52 +98,51 @@ interface ChatMessage {
   tool_call_id?: string;
 }
 
-// Parse DuckDuckGo HTML response
-function parseDuckDuckGoResults(html: string): Array<{ title: string; url: string; content: string }> {
-  const results: Array<{ title: string; url: string; content: string }> = [];
+// List of public SearXNG instances (free, no API key needed)
+const SEARXNG_INSTANCES = [
+  "https://search.sapti.me",
+  "https://searx.be",
+  "https://search.bus-hit.me",
+  "https://searx.tiekoetter.com",
+  "https://search.ononoki.org",
+];
 
-  const resultRegex = /<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
+  // Try each SearXNG instance until one works
+  for (const instance of SEARXNG_INSTANCES) {
+    try {
+      const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=general`;
 
-  let match;
-  while ((match = resultRegex.exec(html)) !== null && results.length < 5) {
-    const url = match[1];
-    const title = match[2].trim();
-    const snippet = match[3]
-      .replace(/<\/?b>/g, "")
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&#x27;/g, "'")
-      .trim();
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
 
-    if (url && title && !url.includes("duckduckgo.com")) {
-      results.push({ title, url, content: snippet });
+      if (!response.ok) {
+        continue;
+      }
+
+      const data = await response.json();
+      const results = (data.results || []).slice(0, 5).map((r: { title?: string; url?: string; content?: string }) => ({
+        title: r.title || "",
+        url: r.url || "",
+        content: r.content || "",
+      }));
+
+      if (results.length > 0) {
+        return { results };
+      }
+    } catch (error) {
+      console.log(`SearXNG instance ${instance} failed, trying next...`);
+      continue;
     }
   }
 
-  return results;
-}
-
-async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
-  // Use DuckDuckGo HTML search (free, no API key needed)
-  const response = await fetch("https://html.duckduckgo.com/html/", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
-    },
-    body: new URLSearchParams({ q: query }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Search failed");
-  }
-
-  const html = await response.text();
-  const results = parseDuckDuckGoResults(html);
-
-  return { results };
+  // All instances failed
+  return { results: [] };
 }
 
 export async function POST(request: NextRequest) {
