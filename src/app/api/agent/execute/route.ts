@@ -172,7 +172,6 @@ interface SteelSession {
 
 interface SteelScrapeResult {
   content: string;
-  screenshot?: string;
   title?: string;
 }
 
@@ -229,7 +228,6 @@ async function browsePage(url: string, sessionId?: string): Promise<SteelScrapeR
         url,
         sessionId,
         format: "markdown",
-        screenshot: true,
       }),
     });
 
@@ -241,7 +239,6 @@ async function browsePage(url: string, sessionId?: string): Promise<SteelScrapeR
     const data = await response.json();
     return {
       content: data.content || "",
-      screenshot: data.screenshot,
       title: data.title,
     };
   } catch (error) {
@@ -469,15 +466,6 @@ Execute this step by searching for relevant information and documenting your fin
                   const browseResult = await browsePage(url, currentSteelSession?.id);
 
                   if (browseResult) {
-                    // Send screenshot update
-                    if (browseResult.screenshot) {
-                      sendEvent("browserState", {
-                        currentUrl: url,
-                        screenshot: browseResult.screenshot,
-                        isActive: true,
-                      });
-                    }
-
                     // Send browsing complete
                     sendEvent("action", {
                       type: "browsing",

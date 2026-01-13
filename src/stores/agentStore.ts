@@ -12,7 +12,6 @@ export interface BrowserState {
   sessionId: string | null;
   liveViewUrl: string | null;
   currentUrl: string | null;
-  screenshot: string | null;
   isActive: boolean;
 }
 
@@ -68,7 +67,6 @@ const initialBrowserState: BrowserState = {
   sessionId: null,
   liveViewUrl: null,
   currentUrl: null,
-  screenshot: null,
   isActive: false,
 };
 
