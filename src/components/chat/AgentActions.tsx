@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useAgentStore, type AgentAction } from "@/stores/agentStore";
 import {
   Brain,
@@ -8,74 +9,129 @@ import {
   FileText,
   AlertCircle,
   Loader2,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 function ActionIcon({ type, status }: { type: AgentAction["type"]; status: AgentAction["status"] }) {
+  const baseClass = "h-4 w-4 flex-shrink-0";
+
   if (status === "running") {
-    return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
+    return <Loader2 className={cn(baseClass, "animate-spin text-sage-600")} />;
   }
 
   switch (type) {
     case "thinking":
-      return <Brain className="h-3.5 w-3.5" />;
+      return <Brain className={cn(baseClass, "text-sage-500")} />;
     case "searching":
-      return <Search className="h-3.5 w-3.5" />;
+      return <Search className={cn(baseClass, "text-sage-500")} />;
     case "search_complete":
-      return <CheckCircle2 className="h-3.5 w-3.5" />;
+      return <CheckCircle2 className={cn(baseClass, "text-sage-500")} />;
     case "writing":
-      return <FileText className="h-3.5 w-3.5" />;
+      return <FileText className={cn(baseClass, "text-sage-500")} />;
     case "complete":
-      return <CheckCircle2 className="h-3.5 w-3.5" />;
+      return <CheckCircle2 className={cn(baseClass, "text-sage-600")} />;
     case "error":
-      return <AlertCircle className="h-3.5 w-3.5" />;
+      return <AlertCircle className={cn(baseClass, "text-grey-400")} />;
     default:
-      return <Brain className="h-3.5 w-3.5" />;
+      return <Brain className={cn(baseClass, "text-sage-500")} />;
   }
 }
 
 export function AgentActions() {
   const { actions, isExecuting, currentStepIndex, stepContents } = useAgentStore();
 
+  // Group actions by step
+  const groupedActions = useMemo(() => {
+    const groups: Map<number, AgentAction[]> = new Map();
+
+    actions.forEach((action) => {
+      const stepIdx = action.stepIndex;
+      if (!groups.has(stepIdx)) {
+        groups.set(stepIdx, []);
+      }
+      groups.get(stepIdx)!.push(action);
+    });
+
+    return groups;
+  }, [actions]);
+
+  // Get all step indices that have actions
+  const stepIndices = useMemo(() => {
+    return Array.from(groupedActions.keys()).sort((a, b) => a - b);
+  }, [groupedActions]);
+
   if (actions.length === 0 && !isExecuting) {
     return null;
   }
 
-  // Get current step content
-  const currentStepContent = stepContents[currentStepIndex] || `Step ${currentStepIndex + 1}`;
-
   return (
-    <div className="flex flex-col gap-3 py-4">
-      {/* Current step indicator */}
-      {isExecuting && (
-        <div className="text-sm font-medium text-grey-700">
-          Step {currentStepIndex + 1}: {currentStepContent}
-        </div>
-      )}
+    <div className="flex flex-col gap-4 py-4">
+      {stepIndices.map((stepIdx) => {
+        const stepActions = groupedActions.get(stepIdx) || [];
+        const stepContent = stepContents[stepIdx] || `Step ${stepIdx + 1}`;
+        const isCurrentStep = stepIdx === currentStepIndex && isExecuting;
+        const isStepComplete = stepActions.some(a => a.type === "complete" && a.status === "completed");
 
-      {/* Action pills - simple flowing layout */}
-      <div className="flex flex-wrap gap-2">
-        {actions.map((action) => (
-          <div
-            key={action.id}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-all",
-              action.status === "running" && "bg-sage-100 text-sage-700 animate-pulse",
-              action.status === "completed" && "bg-grey-100 text-grey-600",
-              action.status === "error" && "bg-grey-200 text-grey-500"
-            )}
-          >
-            <ActionIcon type={action.type} status={action.status} />
-            <span className="max-w-[250px] truncate">{action.label}</span>
+        return (
+          <div key={stepIdx} className="flex flex-col gap-2">
+            {/* Step Header */}
+            <div className={cn(
+              "flex items-center gap-2 text-sm font-medium",
+              isCurrentStep ? "text-sage-700" : "text-grey-600"
+            )}>
+              <div className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
+                isStepComplete ? "bg-sage-500 text-white" :
+                isCurrentStep ? "bg-sage-100 text-sage-700" :
+                "bg-grey-100 text-grey-500"
+              )}>
+                {isStepComplete ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : isCurrentStep ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  stepIdx + 1
+                )}
+              </div>
+              <span className="line-clamp-1">{stepContent}</span>
+            </div>
+
+            {/* Actions for this step - vertical list */}
+            <div className="ml-8 flex flex-col gap-1 border-l-2 border-grey-100 pl-4">
+              {stepActions.map((action, idx) => {
+                // Skip duplicate completed actions (keep only the latest state)
+                const isDuplicate = stepActions.findIndex(
+                  a => a.type === action.type && a.label === action.label
+                ) !== idx && action.status === "running";
+
+                if (isDuplicate) return null;
+
+                return (
+                  <div
+                    key={action.id}
+                    className={cn(
+                      "flex items-center gap-2 py-1 text-sm transition-all",
+                      action.status === "running" && "text-sage-700",
+                      action.status === "completed" && "text-grey-500",
+                      action.status === "error" && "text-grey-400"
+                    )}
+                  >
+                    <ActionIcon type={action.type} status={action.status} />
+                    <span className="line-clamp-1">{action.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
 
-      {/* Completion indicator */}
+      {/* Overall completion */}
       {!isExecuting && actions.length > 0 && (
-        <div className="flex items-center gap-2 text-xs text-grey-500">
-          <CheckCircle2 className="h-3.5 w-3.5 text-sage-500" />
-          <span>Execution complete</span>
+        <div className="flex items-center gap-2 pt-2 border-t border-grey-100 text-sm text-sage-600">
+          <CheckCircle2 className="h-4 w-4" />
+          <span>Research complete</span>
         </div>
       )}
     </div>

@@ -65,8 +65,28 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   setStepContents: (contents) => set({ stepContents: contents }),
 
   addAction: (action) => {
+    const { currentStepIndex, actions } = get();
+
+    // Check if there's an existing action with same type and label in current step
+    // If so, update it instead of adding a duplicate
+    const existingIndex = actions.findIndex(
+      a => a.stepIndex === currentStepIndex &&
+           a.type === action.type &&
+           a.label === action.label
+    );
+
+    if (existingIndex !== -1) {
+      // Update existing action
+      set((state) => ({
+        actions: state.actions.map((a, i) =>
+          i === existingIndex ? { ...a, status: action.status } : a
+        ),
+      }));
+      return actions[existingIndex].id;
+    }
+
+    // Add new action
     const id = nanoid();
-    const { currentStepIndex } = get();
     const newAction: AgentAction = {
       ...action,
       id,
