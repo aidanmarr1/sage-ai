@@ -15,28 +15,20 @@ interface ChatRequest {
 }
 
 const SYSTEM_PROMPTS = {
-  classify: `You are a message classifier. Determine if the user's message is an actionable task/request or just casual conversation (greeting, small talk, questions about you, etc).
+  classify: `Classify this message as "task" or "greeting".
 
-Respond with ONLY one word:
-- "task" - if the message contains something actionable that requires work, research, planning, or a substantive response
-- "greeting" - if the message is just a greeting, small talk, or casual conversation with no specific request
+Reply with ONLY the word "greeting" if the message is JUST a simple greeting with no request:
+- "hi", "hello", "hey", "what's up", "yo"
+- "how are you", "good morning", "good night"
+- "thanks", "thank you", "bye"
 
-Examples of "greeting":
-- "hi", "hello", "hey", "what's up"
-- "how are you", "good morning"
-- "thanks", "thank you"
-- "who are you", "what can you do"
-- "nice to meet you"
+Reply with "task" for EVERYTHING ELSE, including:
+- Any question (what, how, why, can you, etc.)
+- Any request (help me, write, create, build, fix, explain, etc.)
+- Any topic or subject matter
+- Anything longer than 3 words
 
-Examples of "task":
-- "help me write a blog post"
-- "build a website for my business"
-- "research the best laptops"
-- "explain quantum computing"
-- "fix this code"
-- Any specific request or question that needs work
-
-Respond with ONLY "task" or "greeting", nothing else.`,
+Default to "task" if unsure. Reply with only one word.`,
 
   greeting: `You are Sage, a general-purpose AI agent. You can help with research, writing, analysis, task automation, problem-solving, and much more. The user has sent a casual greeting or message. Respond warmly and conversationally in 1-2 sentences. Be friendly and personable. If appropriate, mention that you're ready to help with whatever they need.`,
 
