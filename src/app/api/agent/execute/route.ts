@@ -210,12 +210,12 @@ async function createSteelSession(): Promise<SteelSession | null> {
   }
 }
 
-// Take a screenshot using Steel's screenshot endpoint and convert binary to base64
-async function takeScreenshot(url: string): Promise<string | null> {
+// Take a screenshot using Steel's scrape endpoint with screenshot option
+async function takeScreenshotViaScrape(url: string): Promise<string | null> {
   if (!STEEL_API_KEY) return null;
 
   try {
-    const response = await fetch("https://api.steel.dev/v1/screenshot", {
+    const response = await fetch("https://api.steel.dev/v1/scrape", {
       method: "POST",
       headers: {
         "Steel-Api-Key": STEEL_API_KEY,
@@ -223,20 +223,43 @@ async function takeScreenshot(url: string): Promise<string | null> {
       },
       body: JSON.stringify({
         url,
-        fullPage: false,
+        format: ["html"],
+        screenshot: true,
       }),
     });
 
     if (!response.ok) {
-      console.error("Steel screenshot failed:", response.status);
+      const errorText = await response.text();
+      console.error("Steel scrape/screenshot failed:", response.status, errorText);
       return null;
     }
 
-    // Steel returns binary PNG data - convert to base64
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    console.log("Got screenshot, base64 length:", base64.length);
-    return base64;
+    const data = await response.json();
+    console.log("Steel scrape response - all keys:", JSON.stringify(Object.keys(data)));
+    console.log("Steel scrape response - full data preview:", JSON.stringify(data).substring(0, 500));
+
+    // Check various possible screenshot field names
+    const screenshot = data.screenshot || data.screenshotUrl || data.screenshot_url || data.image || data.imageUrl;
+
+    if (screenshot) {
+      console.log("Found screenshot field, type:", typeof screenshot, "length:", screenshot.length, "starts with:", screenshot.substring(0, 50));
+
+      // If it's a URL, fetch and convert to base64
+      if (screenshot.startsWith("http")) {
+        console.log("Screenshot is a URL, fetching...");
+        const imgResponse = await fetch(screenshot);
+        const arrayBuffer = await imgResponse.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString("base64");
+        console.log("Converted URL to base64, length:", base64.length);
+        return base64;
+      }
+
+      // If it already looks like base64
+      return screenshot;
+    }
+
+    console.log("No screenshot field found in response");
+    return null;
   } catch (error) {
     console.error("Screenshot error:", error);
     return null;
@@ -255,7 +278,7 @@ async function browsePage(
 
   try {
     // Take screenshot first (this also navigates to the page)
-    const screenshot = await takeScreenshot(url);
+    const screenshot = await takeScreenshotViaScrape(url);
     if (screenshot) {
       onScreenshot(screenshot);
     }
