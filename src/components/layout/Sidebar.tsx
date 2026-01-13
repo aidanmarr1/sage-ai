@@ -78,11 +78,18 @@ export function Sidebar() {
 
   const handleNavClick = (navId: string) => {
     setActiveNav(navId);
-    if (navId === "tasks") {
+    if (navId === "tasks" || navId === "home") {
       // Start new task - clear current conversation and messages
       setCurrentConversation(null);
       clearMessages();
       clearPlan();
+      router.push("/");
+    } else if (navId === "help") {
+      router.push("/help");
+    } else if (navId === "settings") {
+      router.push("/settings");
+    } else if (navId === "history") {
+      // TODO: Implement history page
       router.push("/");
     }
   };
