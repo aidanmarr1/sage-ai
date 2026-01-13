@@ -212,15 +212,21 @@ async function createSteelSession(): Promise<SteelSession | null> {
   }
 }
 
-async function takeScreenshot(sessionId: string): Promise<string | null> {
+async function takeScreenshot(url: string, sessionId?: string): Promise<string | null> {
   if (!STEEL_API_KEY) return null;
 
   try {
-    const response = await fetch(`https://api.steel.dev/v1/sessions/${sessionId}/screenshot`, {
-      method: "GET",
+    const response = await fetch("https://api.steel.dev/v1/screenshot", {
+      method: "POST",
       headers: {
         "Steel-Api-Key": STEEL_API_KEY,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        url,
+        sessionId,
+        fullPage: false,
+      }),
     });
 
     if (!response.ok) return null;
@@ -242,21 +248,13 @@ async function browsePage(
     return null;
   }
 
-  // Start screenshot streaming in background
-  let stopScreenshots = false;
-  const screenshotLoop = async () => {
-    while (!stopScreenshots && sessionId) {
-      const screenshot = await takeScreenshot(sessionId);
-      if (screenshot && !stopScreenshots) {
-        onScreenshot(screenshot);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 800)); // Update every 800ms
-    }
-  };
+  // Take initial screenshot immediately
+  const initialScreenshot = await takeScreenshot(url, sessionId);
+  if (initialScreenshot) {
+    onScreenshot(initialScreenshot);
+  }
 
-  // Start the screenshot loop
-  const screenshotPromise = screenshotLoop();
-
+  // Start scraping (this navigates and extracts content)
   try {
     const response = await fetch("https://api.steel.dev/v1/scrape", {
       method: "POST",
@@ -268,11 +266,9 @@ async function browsePage(
         url,
         sessionId,
         format: "markdown",
+        screenshot: true, // Get screenshot with scrape
       }),
     });
-
-    // Stop screenshot loop
-    stopScreenshots = true;
 
     if (!response.ok) {
       console.error("Steel scrape failed:", response.status);
@@ -281,20 +277,17 @@ async function browsePage(
 
     const data = await response.json();
 
-    // Take one final screenshot
-    if (sessionId) {
-      const finalScreenshot = await takeScreenshot(sessionId);
-      if (finalScreenshot) {
-        onScreenshot(finalScreenshot);
-      }
+    // Send the final screenshot from scrape result
+    if (data.screenshot) {
+      onScreenshot(data.screenshot);
     }
 
     return {
       content: data.content || "",
       title: data.title,
+      screenshot: data.screenshot,
     };
   } catch (error) {
-    stopScreenshots = true;
     console.error("Steel browse error:", error);
     return null;
   }
