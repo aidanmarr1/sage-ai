@@ -98,44 +98,52 @@ interface ChatMessage {
   tool_call_id?: string;
 }
 
-async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+// Parse DuckDuckGo HTML response
+function parseDuckDuckGoResults(html: string): Array<{ title: string; url: string; content: string }> {
+  const results: Array<{ title: string; url: string; content: string }> = [];
 
-  // We need to make an internal call or directly call Tavily
-  const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
+  const resultRegex = /<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
 
-  if (!TAVILY_API_KEY) {
-    throw new Error("Search service not configured");
+  let match;
+  while ((match = resultRegex.exec(html)) !== null && results.length < 5) {
+    const url = match[1];
+    const title = match[2].trim();
+    const snippet = match[3]
+      .replace(/<\/?b>/g, "")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#x27;/g, "'")
+      .trim();
+
+    if (url && title && !url.includes("duckduckgo.com")) {
+      results.push({ title, url, content: snippet });
+    }
   }
 
-  const response = await fetch("https://api.tavily.com/search", {
+  return results;
+}
+
+async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
+  // Use DuckDuckGo HTML search (free, no API key needed)
+  const response = await fetch("https://html.duckduckgo.com/html/", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
     },
-    body: JSON.stringify({
-      api_key: TAVILY_API_KEY,
-      query,
-      search_depth: "basic",
-      include_answer: false,
-      include_images: false,
-      include_raw_content: false,
-      max_results: 5,
-    }),
+    body: new URLSearchParams({ q: query }),
   });
 
   if (!response.ok) {
     throw new Error("Search failed");
   }
 
-  const data = await response.json();
-  return {
-    results: (data.results || []).map((r: { title: string; url: string; content: string }) => ({
-      title: r.title,
-      url: r.url,
-      content: r.content,
-    })),
-  };
+  const html = await response.text();
+  const results = parseDuckDuckGoResults(html);
+
+  return { results };
 }
 
 export async function POST(request: NextRequest) {

@@ -1,19 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
-const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
-const TAVILY_API_URL = "https://api.tavily.com/search";
+// DuckDuckGo HTML search endpoint (free, no API key needed)
+const DUCKDUCKGO_URL = "https://html.duckduckgo.com/html/";
 
 export interface SearchResult {
   title: string;
   url: string;
   content: string;
-  score: number;
 }
 
 export interface SearchResponse {
   results: SearchResult[];
   query: string;
+}
+
+// Parse DuckDuckGo HTML response
+function parseDuckDuckGoResults(html: string): SearchResult[] {
+  const results: SearchResult[] = [];
+
+  // Match result blocks
+  const resultRegex = /<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>([^<]+)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+
+  let match;
+  while ((match = resultRegex.exec(html)) !== null && results.length < 6) {
+    const url = match[1];
+    const title = match[2].trim();
+    const snippet = match[3]
+      .replace(/<\/?b>/g, "") // Remove bold tags
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#x27;/g, "'")
+      .trim();
+
+    if (url && title && !url.includes("duckduckgo.com")) {
+      results.push({ title, url, content: snippet });
+    }
+  }
+
+  // Fallback: try simpler pattern if above didn't work
+  if (results.length === 0) {
+    const simpleRegex = /<a class="result__url"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<a class="result__a"[^>]*>([^<]+)<\/a>/g;
+    while ((match = simpleRegex.exec(html)) !== null && results.length < 6) {
+      const url = match[1];
+      const title = match[2].trim();
+      if (url && title) {
+        results.push({ title, url, content: "" });
+      }
+    }
+  }
+
+  return results;
 }
 
 export async function POST(request: NextRequest) {
@@ -27,14 +66,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!TAVILY_API_KEY) {
-      console.error("TAVILY_API_KEY is not configured");
-      return NextResponse.json(
-        { error: "Search service not configured" },
-        { status: 500 }
-      );
-    }
-
     const body = await request.json();
     const { query } = body;
 
@@ -45,46 +76,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call Tavily API
-    const response = await fetch(TAVILY_API_URL, {
+    // Call DuckDuckGo HTML search (free, no API key)
+    const response = await fetch(DUCKDUCKGO_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
       },
-      body: JSON.stringify({
-        api_key: TAVILY_API_KEY,
-        query,
-        search_depth: "basic",
-        include_answer: false,
-        include_images: false,
-        include_raw_content: false,
-        max_results: 6,
-      }),
+      body: new URLSearchParams({ q: query }),
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error("Tavily API error:", error);
+      console.error("DuckDuckGo search error:", response.status);
       return NextResponse.json(
         { error: "Search failed" },
         { status: response.status }
       );
     }
 
-    const data = await response.json();
-
-    // Transform Tavily response to our format
-    const results: SearchResult[] = (data.results || []).map((result: {
-      title: string;
-      url: string;
-      content: string;
-      score: number;
-    }) => ({
-      title: result.title,
-      url: result.url,
-      content: result.content,
-      score: result.score,
-    }));
+    const html = await response.text();
+    const results = parseDuckDuckGoResults(html);
 
     return NextResponse.json({
       results,
