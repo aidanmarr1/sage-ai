@@ -19,6 +19,71 @@ export function PlanPanel() {
   const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
 
+  const executeStep = async (stepIndex: number, stepContent: string, taskContext: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const currentFindings = useAgentStore.getState().findings;
+
+      fetch("/api/agent/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: stepContent,
+          stepIndex,
+          taskContext,
+          currentFindings,
+        }),
+      }).then(async (response) => {
+        if (!response.ok || !response.body) {
+          resolve(false);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const text = decoder.decode(value);
+          const lines = text.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const event = JSON.parse(line.slice(6));
+
+                if (event.type === "action") {
+                  // Add or update action in store
+                  addAction({
+                    type: event.data.type,
+                    label: event.data.label,
+                    status: event.data.status,
+                  });
+                } else if (event.type === "searchResults") {
+                  // Update search results for ComputerPanel
+                  setLatestSearchResults(event.data);
+                } else if (event.type === "findings") {
+                  // Append findings
+                  appendFindings(event.data);
+                } else if (event.type === "done") {
+                  resolve(true);
+                  return;
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+
+        resolve(true);
+      }).catch(() => {
+        resolve(false);
+      });
+    });
+  };
+
   const handleExecute = async () => {
     if (!currentPlan || isExecuting) return;
 
@@ -38,68 +103,17 @@ export function PlanPanel() {
         setCurrentStepIndex(i);
         updateStepStatus(step.id, "in_progress");
 
-        // Add thinking action
-        const thinkingId = addAction({
-          type: "thinking",
-          label: `Analyzing step ${i + 1}...`,
-          status: "running",
-        });
+        const success = await executeStep(i, step.content, currentPlan.title);
 
-        try {
-          const response = await fetch("/api/agent/execute", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              step: step.content,
-              stepIndex: i,
-              taskContext: currentPlan.title,
-              currentFindings: useAgentStore.getState().findings,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error("Execution failed");
-          }
-
-          const data = await response.json();
-
-          // Complete thinking action
-          completeAction(thinkingId);
-
-          // Add all actions from response
-          for (const action of data.actions || []) {
-            if (action.type !== "thinking") { // Skip duplicate thinking
-              const actionId = addAction({
-                type: action.type,
-                label: action.label,
-                detail: action.detail,
-                status: "completed",
-              });
-            }
-          }
-
-          // Update search results for ComputerPanel
-          if (data.searchResults && data.searchResults.length > 0) {
-            setLatestSearchResults(data.searchResults);
-          }
-
-          // Append findings
-          if (data.newFindings) {
-            appendFindings(data.newFindings);
-          }
-
-          // Mark step complete
+        if (success) {
           updateStepStatus(step.id, "completed");
-
-        } catch (error) {
-          console.error("Step execution error:", error);
+        } else {
           addAction({
             type: "error",
             label: `Step ${i + 1} failed`,
-            detail: error instanceof Error ? error.message : "Unknown error",
             status: "error",
           });
-          updateStepStatus(step.id, "pending"); // Reset to pending on error
+          updateStepStatus(step.id, "pending");
           break;
         }
       }
