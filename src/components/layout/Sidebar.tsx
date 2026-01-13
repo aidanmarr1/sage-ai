@@ -88,6 +88,8 @@ export function Sidebar() {
   };
 
   const handleConversationClick = (convId: string) => {
+    console.log("Clicking conversation:", convId);
+    setCurrentConversation(convId);
     router.push(`/task/${convId}`);
   };
 
