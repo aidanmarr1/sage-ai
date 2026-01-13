@@ -210,6 +210,39 @@ async function createSteelSession(): Promise<SteelSession | null> {
   }
 }
 
+// Take a screenshot using Steel's screenshot endpoint and convert binary to base64
+async function takeScreenshot(url: string): Promise<string | null> {
+  if (!STEEL_API_KEY) return null;
+
+  try {
+    const response = await fetch("https://api.steel.dev/v1/screenshot", {
+      method: "POST",
+      headers: {
+        "Steel-Api-Key": STEEL_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url,
+        fullPage: false,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Steel screenshot failed:", response.status);
+      return null;
+    }
+
+    // Steel returns binary PNG data - convert to base64
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    console.log("Got screenshot, base64 length:", base64.length);
+    return base64;
+  } catch (error) {
+    console.error("Screenshot error:", error);
+    return null;
+  }
+}
+
 async function browsePage(
   url: string,
   sessionId: string | undefined,
@@ -221,7 +254,13 @@ async function browsePage(
   }
 
   try {
-    // Use Steel's scrape endpoint which navigates, extracts content, and captures screenshot
+    // Take screenshot first (this also navigates to the page)
+    const screenshot = await takeScreenshot(url);
+    if (screenshot) {
+      onScreenshot(screenshot);
+    }
+
+    // Now scrape the page for content
     const response = await fetch("https://api.steel.dev/v1/scrape", {
       method: "POST",
       headers: {
@@ -232,28 +271,18 @@ async function browsePage(
         url,
         sessionId,
         format: "markdown",
-        screenshot: true,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Steel scrape failed:", response.status, errorText);
-      return null;
+      // Still return with screenshot if we have it
+      return screenshot ? { content: "", screenshot } : null;
     }
 
     const data = await response.json();
     console.log("Steel scrape response keys:", Object.keys(data));
-
-    // Send the screenshot to the frontend
-    // Steel may return screenshot as 'screenshot' or 'image' depending on version
-    const screenshot = data.screenshot || data.image;
-    if (screenshot) {
-      console.log("Got screenshot, length:", screenshot.length);
-      onScreenshot(screenshot);
-    } else {
-      console.log("No screenshot in response");
-    }
 
     return {
       content: data.content || data.markdown || "",
