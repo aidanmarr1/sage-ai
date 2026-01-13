@@ -26,61 +26,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    // DuckDuckGo Instant Answer API - free, no key needed, returns JSON
-    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    // Wikipedia API - completely free, no key needed, returns actual results
+    const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&origin=*`;
 
-    const response = await fetch(ddgUrl, {
-      headers: {
-        "Accept": "application/json",
-      },
+    const searchResponse = await fetch(wikiSearchUrl, {
+      headers: { "Accept": "application/json" },
     });
 
-    if (!response.ok) {
-      throw new Error("DuckDuckGo API failed");
+    if (!searchResponse.ok) {
+      throw new Error("Wikipedia API failed");
     }
 
-    const data = await response.json();
+    const searchData = await searchResponse.json();
+    const searchResults = searchData.query?.search || [];
+
+    if (searchResults.length === 0) {
+      return NextResponse.json({ results: [], query } as SearchResponse);
+    }
+
+    // Get page extracts for the found articles
+    const pageIds = searchResults.map((r: { pageid: number }) => r.pageid).join("|");
+    const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&pageids=${pageIds}&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
+
+    const extractResponse = await fetch(extractUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    const extractData = await extractResponse.json();
+    const pages = extractData.query?.pages || {};
+
     const results: SearchResult[] = [];
 
-    // Abstract (main answer)
-    if (data.Abstract && data.AbstractURL) {
+    for (const result of searchResults) {
+      const page = pages[result.pageid];
+      const extract = page?.extract || result.snippet?.replace(/<[^>]*>/g, "") || "";
+
       results.push({
-        title: data.Heading || "Summary",
-        url: data.AbstractURL,
-        content: data.Abstract,
+        title: result.title,
+        url: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, "_"))}`,
+        content: extract.substring(0, 500) + (extract.length > 500 ? "..." : ""),
       });
     }
 
-    // Related topics
-    if (data.RelatedTopics) {
-      for (const topic of data.RelatedTopics.slice(0, 5)) {
-        if (topic.Text && topic.FirstURL) {
-          results.push({
-            title: topic.Text.split(" - ")[0] || topic.Text.substring(0, 50),
-            url: topic.FirstURL,
-            content: topic.Text,
-          });
-        }
-        // Handle nested topics
-        if (topic.Topics) {
-          for (const subtopic of topic.Topics.slice(0, 2)) {
-            if (subtopic.Text && subtopic.FirstURL) {
-              results.push({
-                title: subtopic.Text.split(" - ")[0] || subtopic.Text.substring(0, 50),
-                url: subtopic.FirstURL,
-                content: subtopic.Text,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    // If no results from instant answers, return empty but don't fail
-    return NextResponse.json({
-      results: results.slice(0, 6),
-      query,
-    } as SearchResponse);
+    return NextResponse.json({ results, query } as SearchResponse);
 
   } catch (error) {
     console.error("Search API error:", error);

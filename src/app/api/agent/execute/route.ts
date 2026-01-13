@@ -106,44 +106,50 @@ interface ChatMessage {
 }
 
 async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
-  // DuckDuckGo Instant Answer API - free, no key needed
-  const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  // Wikipedia API - completely free, no key needed, returns actual results
+  const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&origin=*`;
 
   try {
-    const response = await fetch(ddgUrl, {
+    const searchResponse = await fetch(wikiSearchUrl, {
       headers: { "Accept": "application/json" },
     });
 
-    if (!response.ok) {
+    if (!searchResponse.ok) {
       return { results: [] };
     }
 
-    const data = await response.json();
+    const searchData = await searchResponse.json();
+    const searchResults = searchData.query?.search || [];
+
+    if (searchResults.length === 0) {
+      return { results: [] };
+    }
+
+    // Get page extracts for the found articles
+    const pageIds = searchResults.map((r: { pageid: number }) => r.pageid).join("|");
+    const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&pageids=${pageIds}&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
+
+    const extractResponse = await fetch(extractUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    const extractData = await extractResponse.json();
+    const pages = extractData.query?.pages || {};
+
     const results: Array<{ title: string; url: string; content: string }> = [];
 
-    // Abstract (main answer)
-    if (data.Abstract && data.AbstractURL) {
+    for (const result of searchResults) {
+      const page = pages[result.pageid];
+      const extract = page?.extract || result.snippet?.replace(/<[^>]*>/g, "") || "";
+
       results.push({
-        title: data.Heading || "Summary",
-        url: data.AbstractURL,
-        content: data.Abstract,
+        title: result.title,
+        url: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, "_"))}`,
+        content: extract.substring(0, 500) + (extract.length > 500 ? "..." : ""),
       });
     }
 
-    // Related topics
-    if (data.RelatedTopics) {
-      for (const topic of data.RelatedTopics.slice(0, 4)) {
-        if (topic.Text && topic.FirstURL) {
-          results.push({
-            title: topic.Text.split(" - ")[0] || topic.Text.substring(0, 50),
-            url: topic.FirstURL,
-            content: topic.Text,
-          });
-        }
-      }
-    }
-
-    return { results: results.slice(0, 5) };
+    return { results };
   } catch (error) {
     console.error("Search error:", error);
     return { results: [] };
