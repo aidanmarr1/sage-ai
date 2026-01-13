@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -64,6 +64,12 @@ import {
   Maximize2,
   Minimize2,
   LayoutGrid,
+  Copy,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowUp,
+  RefreshCw,
+  Repeat,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -253,6 +259,49 @@ const useCases = [
   },
 ];
 
+const howToGuides = [
+  {
+    title: "Write Effective Prompts",
+    icon: PenTool,
+    tips: [
+      "Be specific about your goal and desired outcome",
+      "Include relevant context and constraints",
+      "Specify the format you want (bullet points, paragraphs, etc.)",
+      "Mention your target audience if applicable",
+    ],
+  },
+  {
+    title: "Use Images for Better Results",
+    icon: Image,
+    tips: [
+      "Attach screenshots when asking about UI/UX feedback",
+      "Include diagrams to explain complex ideas",
+      "Share examples of styles you like",
+      "Use clear, high-quality images for best results",
+    ],
+  },
+  {
+    title: "Break Down Complex Tasks",
+    icon: ListChecks,
+    tips: [
+      "Start with the big picture, then drill into details",
+      "Ask for one thing at a time for better focus",
+      "Use follow-up messages to refine and expand",
+      "Review each step before moving to the next",
+    ],
+  },
+  {
+    title: "Iterate on Sage's Responses",
+    icon: RefreshCw,
+    tips: [
+      "Say 'Make it shorter' or 'Add more detail'",
+      "Ask to 'Try a different approach'",
+      "Request specific changes: 'Change the tone to...'",
+      "Build on good parts: 'Keep X but change Y'",
+    ],
+  },
+];
+
 const proTips = [
   {
     tip: "Be Specific",
@@ -308,6 +357,8 @@ const advancedTips = [
     icon: Eye,
   },
 ];
+
+const faqCategories = ["All", "General", "Features", "Account", "Usage", "Privacy"];
 
 const faqs = [
   {
@@ -505,6 +556,7 @@ const whatsNewItems = [
     version: "1.2.0",
     date: "January 2025",
     title: "Enhanced Task Management",
+    isNew: true,
     highlights: [
       "Star important tasks for quick access",
       "Improved sidebar navigation",
@@ -516,6 +568,7 @@ const whatsNewItems = [
     version: "1.1.0",
     date: "December 2024",
     title: "Image Attachments",
+    isNew: false,
     highlights: [
       "Attach images to your messages",
       "Support for PNG, JPG, GIF, WebP",
@@ -527,6 +580,7 @@ const whatsNewItems = [
     version: "1.0.0",
     date: "November 2024",
     title: "Initial Launch",
+    isNew: false,
     highlights: [
       "AI-powered task assistance",
       "Smart plan generation",
@@ -572,6 +626,109 @@ const onboardingChecklist = [
 // COMPONENTS
 // ============================================================================
 
+function CopyButton({ text, className }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-lg transition-all",
+        copied
+          ? "bg-sage-100 text-sage-600"
+          : "text-grey-400 hover:bg-grey-100 hover:text-grey-600",
+        className
+      )}
+      title={copied ? "Copied!" : "Copy to clipboard"}
+    >
+      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+    </button>
+  );
+}
+
+function WasThisHelpful({ section }: { section: string }) {
+  const [feedback, setFeedback] = useState<"yes" | "no" | null>(null);
+
+  if (feedback) {
+    return (
+      <div className="mt-8 rounded-xl border border-sage-200 bg-sage-50 p-4 text-center">
+        <p className="text-sage-700 font-medium">Thanks for your feedback!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-8 rounded-xl border border-grey-200 bg-grey-50 p-4">
+      <div className="flex items-center justify-center gap-4">
+        <span className="text-grey-600 text-sm">Was this helpful?</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFeedback("yes")}
+            className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-grey-700 shadow-sm ring-1 ring-grey-200 transition-all hover:bg-sage-50 hover:text-sage-700 hover:ring-sage-200"
+          >
+            <ThumbsUp className="h-4 w-4" />
+            Yes
+          </button>
+          <button
+            onClick={() => setFeedback("no")}
+            className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-grey-700 shadow-sm ring-1 ring-grey-200 transition-all hover:bg-grey-100"
+          >
+            <ThumbsDown className="h-4 w-4" />
+            No
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScrollToTop() {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const toggleVisibility = () => {
+      if (window.scrollY > 400) {
+        setIsVisible(true);
+      } else {
+        setIsVisible(false);
+      }
+    };
+
+    window.addEventListener("scroll", toggleVisibility);
+    return () => window.removeEventListener("scroll", toggleVisibility);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <button
+      onClick={scrollToTop}
+      className={cn(
+        "fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-sage-500 text-white shadow-lg transition-all hover:bg-sage-600 hover:shadow-xl",
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
+      )}
+      aria-label="Scroll to top"
+    >
+      <ArrowUp className="h-5 w-5" />
+    </button>
+  );
+}
+
 function OnboardingChecklist() {
   const [completed, setCompleted] = useState<string[]>([]);
 
@@ -584,12 +741,18 @@ function OnboardingChecklist() {
   };
 
   const progress = (completed.length / onboardingChecklist.length) * 100;
+  const allComplete = completed.length === onboardingChecklist.length;
 
   return (
     <div className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
-      <div className="border-b border-grey-100 bg-gradient-to-r from-sage-50 to-white p-5">
+      <div className={cn(
+        "border-b border-grey-100 p-5 transition-colors",
+        allComplete ? "bg-sage-100" : "bg-gradient-to-r from-sage-50 to-white"
+      )}>
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-grey-900">Getting Started Checklist</h4>
+          <h4 className="font-semibold text-grey-900">
+            {allComplete ? "All Done!" : "Getting Started Checklist"}
+          </h4>
           <span className="text-sm font-medium text-sage-600">
             {completed.length}/{onboardingChecklist.length} complete
           </span>
@@ -614,9 +777,9 @@ function OnboardingChecklist() {
               )}
             >
               <div className={cn(
-                "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-all transform",
                 isComplete
-                  ? "border-sage-500 bg-sage-500"
+                  ? "border-sage-500 bg-sage-500 scale-110"
                   : "border-grey-300"
               )}>
                 {isComplete && <Check className="h-3.5 w-3.5 text-white" />}
@@ -640,7 +803,7 @@ function OnboardingChecklist() {
 
 function ExampleConversation({ example }: { example: typeof exampleConversations[0] }) {
   return (
-    <div className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
+    <div className="rounded-2xl border border-grey-200 bg-white overflow-hidden transition-all hover:shadow-md">
       <div className="border-b border-grey-100 bg-grey-50 px-5 py-3">
         <span className={cn(
           "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
@@ -691,65 +854,103 @@ function ExampleConversation({ example }: { example: typeof exampleConversations
   );
 }
 
-function FAQAccordion({ items, searchQuery }: { items: typeof faqs; searchQuery: string }) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+function FAQAccordion({
+  items,
+  searchQuery,
+  selectedCategory,
+  allExpanded
+}: {
+  items: typeof faqs;
+  searchQuery: string;
+  selectedCategory: string;
+  allExpanded: boolean;
+}) {
+  const [openIndices, setOpenIndices] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (allExpanded) {
+      setOpenIndices(items.map((_, i) => i));
+    } else {
+      setOpenIndices([]);
+    }
+  }, [allExpanded, items]);
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery) return items;
-    const query = searchQuery.toLowerCase();
-    return items.filter(
-      (item) =>
-        item.question.toLowerCase().includes(query) ||
-        item.answer.toLowerCase().includes(query)
+    let filtered = items;
+
+    if (selectedCategory !== "All") {
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (item) =>
+          item.question.toLowerCase().includes(query) ||
+          item.answer.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [items, searchQuery, selectedCategory]);
+
+  const toggleItem = (index: number) => {
+    setOpenIndices(prev =>
+      prev.includes(index)
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
     );
-  }, [items, searchQuery]);
+  };
 
   if (filteredItems.length === 0) {
     return (
       <div className="rounded-xl border border-grey-200 bg-grey-50 p-6 text-center">
-        <p className="text-grey-600">No matching questions found. Try a different search term.</p>
+        <p className="text-grey-600">No matching questions found. Try a different search term or category.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      {filteredItems.map((item, index) => (
-        <div
-          key={index}
-          className="overflow-hidden rounded-xl border border-grey-200 bg-white transition-shadow hover:shadow-sm"
-        >
-          <button
-            onClick={() => setOpenIndex(openIndex === index ? null : index)}
-            className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-grey-50"
-          >
-            <div className="flex items-center gap-3 pr-4">
-              <span className="rounded-full bg-sage-100 px-2 py-0.5 text-xs font-medium text-sage-700">
-                {item.category}
-              </span>
-              <span className="font-medium text-grey-900">{item.question}</span>
-            </div>
-            <ChevronDown
-              className={cn(
-                "h-5 w-5 flex-shrink-0 text-grey-400 transition-transform duration-200",
-                openIndex === index && "rotate-180"
-              )}
-            />
-          </button>
+      {filteredItems.map((item, index) => {
+        const isOpen = openIndices.includes(index);
+        return (
           <div
-            className={cn(
-              "grid transition-all duration-200",
-              openIndex === index ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-            )}
+            key={index}
+            className="overflow-hidden rounded-xl border border-grey-200 bg-white transition-shadow hover:shadow-sm"
           >
-            <div className="overflow-hidden">
-              <div className="border-t border-grey-100 bg-grey-50/50 px-5 py-4">
-                <p className="text-grey-600 leading-relaxed">{item.answer}</p>
+            <button
+              onClick={() => toggleItem(index)}
+              className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-grey-50"
+            >
+              <div className="flex items-center gap-3 pr-4">
+                <span className="rounded-full bg-sage-100 px-2 py-0.5 text-xs font-medium text-sage-700">
+                  {item.category}
+                </span>
+                <span className="font-medium text-grey-900">{item.question}</span>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-5 w-5 flex-shrink-0 text-grey-400 transition-transform duration-200",
+                  isOpen && "rotate-180"
+                )}
+              />
+            </button>
+            <div
+              className={cn(
+                "grid transition-all duration-200",
+                isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+              )}
+            >
+              <div className="overflow-hidden">
+                <div className="border-t border-grey-100 bg-grey-50/50 px-5 py-4">
+                  <p className="text-grey-600 leading-relaxed">{item.answer}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -766,6 +967,7 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
     ...proTips.map((t) => ({ type: "Tip", title: t.tip, content: t.description })),
     ...advancedTips.map((t) => ({ type: "Advanced Tip", title: t.tip, content: t.description })),
     ...useCases.flatMap((c) => c.examples.map(e => ({ type: "Example", title: c.category, content: e }))),
+    ...howToGuides.flatMap((g) => g.tips.map(t => ({ type: "How To", title: g.title, content: t }))),
   ];
 
   const results = allContent.filter(
@@ -773,6 +975,20 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
       item.title.toLowerCase().includes(query.toLowerCase()) ||
       item.content.toLowerCase().includes(query.toLowerCase())
   );
+
+  // Highlight matching text
+  const highlightMatch = (text: string, query: string) => {
+    const parts = text.split(new RegExp(`(${query})`, "gi"));
+    return parts.map((part, i) =>
+      part.toLowerCase() === query.toLowerCase() ? (
+        <mark key={i} className="bg-sage-100 text-sage-800 rounded px-0.5">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
 
   if (results.length === 0) {
     return (
@@ -811,15 +1027,16 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
         {results.slice(0, 15).map((result, index) => (
           <div
             key={index}
-            className="rounded-xl border border-grey-200 bg-white p-4 transition-shadow hover:shadow-sm"
+            className="rounded-xl border border-grey-200 bg-white p-4 transition-all hover:shadow-sm animate-fade-in"
+            style={{ animationDelay: `${index * 50}ms` }}
           >
             <div className="flex items-center gap-2 mb-2">
               <span className="rounded-full bg-sage-100 px-2.5 py-0.5 text-xs font-medium text-sage-700">
                 {result.type}
               </span>
-              <h4 className="font-medium text-grey-900">{result.title}</h4>
+              <h4 className="font-medium text-grey-900">{highlightMatch(result.title, query)}</h4>
             </div>
-            <p className="text-sm text-grey-600 line-clamp-2">{result.content}</p>
+            <p className="text-sm text-grey-600 line-clamp-2">{highlightMatch(result.content, query)}</p>
           </div>
         ))}
       </div>
@@ -842,7 +1059,7 @@ function KeyboardShortcutTable({ shortcuts }: { shortcuts: typeof keyboardShortc
             <table className="w-full">
               <tbody className="divide-y divide-grey-100">
                 {shortcuts.filter(s => s.category === category).map((shortcut, index) => (
-                  <tr key={index} className="bg-white transition-colors hover:bg-grey-50">
+                  <tr key={index} className="bg-white transition-colors hover:bg-grey-50 group">
                     <td className="px-5 py-3 w-40">
                       <div className="flex items-center gap-1.5">
                         {shortcut.keys.map((key, i) => (
@@ -859,6 +1076,12 @@ function KeyboardShortcutTable({ shortcuts }: { shortcuts: typeof keyboardShortc
                     </td>
                     <td className="px-5 py-3 font-medium text-grey-900">{shortcut.action}</td>
                     <td className="hidden sm:table-cell px-5 py-3 text-grey-600">{shortcut.description}</td>
+                    <td className="px-3 py-3 w-12">
+                      <CopyButton
+                        text={shortcut.keys.join(" + ")}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -878,12 +1101,15 @@ export default function HelpPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSection, setActiveSection] = useState<string>("interface");
+  const [faqCategory, setFaqCategory] = useState("All");
+  const [faqAllExpanded, setFaqAllExpanded] = useState(false);
 
   const isSearching = searchQuery.length > 2;
 
   const navItems = [
     { id: "interface", label: "Interface Guide", icon: Layout },
     { id: "examples", label: "Example Conversations", icon: MessageCircle },
+    { id: "how-to", label: "How To Guides", icon: BookOpen, isNew: true },
     { id: "faq", label: "FAQ", icon: HelpCircle },
     { id: "shortcuts", label: "Keyboard Shortcuts", icon: Keyboard },
     { id: "troubleshooting", label: "Troubleshooting", icon: AlertTriangle },
@@ -896,6 +1122,9 @@ export default function HelpPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sage-50/30 via-white to-grey-50/50">
+      {/* Scroll to Top Button */}
+      <ScrollToTop />
+
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-grey-200/80 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
@@ -957,12 +1186,12 @@ export default function HelpPage() {
 
             {/* Quick Links */}
             <div className="flex flex-wrap justify-center gap-2 mt-6">
-              {["Getting Started", "Keyboard Shortcuts", "Troubleshooting", "FAQ"].map((link) => (
+              {["Getting Started", "How To Guides", "Keyboard Shortcuts", "FAQ"].map((link) => (
                 <button
                   key={link}
                   onClick={() => {
                     setSearchQuery("");
-                    const sectionId = link.toLowerCase().replace(" ", "-");
+                    const sectionId = link.toLowerCase().replace(/ /g, "-");
                     if (sectionId === "getting-started") setActiveSection("interface");
                     else if (sectionId === "keyboard-shortcuts") setActiveSection("shortcuts");
                     else setActiveSection(sectionId);
@@ -1030,19 +1259,25 @@ export default function HelpPage() {
                   return (
                     <div
                       key={category.category}
-                      className="rounded-2xl border border-grey-200 bg-white p-5 transition-all hover:shadow-md"
+                      className="group rounded-2xl border border-grey-200 bg-white p-5 transition-all hover:shadow-md hover:border-sage-200"
                     >
-                      <div className="mb-4 flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-100">
-                          <Icon className="h-5 w-5 text-sage-600" />
+                      <div className="mb-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-100">
+                            <Icon className="h-5 w-5 text-sage-600" />
+                          </div>
+                          <h4 className="font-semibold text-grey-900">{category.category}</h4>
                         </div>
-                        <h4 className="font-semibold text-grey-900">{category.category}</h4>
                       </div>
                       <ul className="space-y-2">
                         {category.examples.slice(0, 3).map((example, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-grey-600">
+                          <li key={i} className="group/item flex items-start gap-2 text-sm text-grey-600">
                             <ChevronRight className="h-4 w-4 mt-0.5 text-sage-400 flex-shrink-0" />
-                            <span className="line-clamp-1">"{example}"</span>
+                            <span className="line-clamp-1 flex-1">"{example}"</span>
+                            <CopyButton
+                              text={example}
+                              className="opacity-0 group-hover/item:opacity-100 h-6 w-6"
+                            />
                           </li>
                         ))}
                       </ul>
@@ -1127,6 +1362,11 @@ export default function HelpPage() {
                             >
                               <Icon className="h-4 w-4" />
                               {item.label}
+                              {item.isNew && (
+                                <span className="ml-auto rounded-full bg-sage-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                  NEW
+                                </span>
+                              )}
                             </button>
                           );
                         })}
@@ -1142,7 +1382,7 @@ export default function HelpPage() {
                 <div className="lg:col-span-3">
                   {/* Interface Guide */}
                   {activeSection === "interface" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Interface Guide</h3>
                       <p className="text-grey-600 mb-6">Learn your way around Sage's interface</p>
 
@@ -1177,12 +1417,13 @@ export default function HelpPage() {
                           );
                         })}
                       </div>
+                      <WasThisHelpful section="interface" />
                     </div>
                   )}
 
                   {/* Example Conversations */}
                   {activeSection === "examples" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Example Conversations</h3>
                       <p className="text-grey-600 mb-6">See how Sage responds to different types of requests</p>
 
@@ -1218,23 +1459,106 @@ export default function HelpPage() {
                           </div>
                         </div>
                       </div>
+                      <WasThisHelpful section="examples" />
+                    </div>
+                  )}
+
+                  {/* How To Guides */}
+                  {activeSection === "how-to" && (
+                    <div className="animate-fade-in">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-serif text-xl font-bold text-grey-900">How To Guides</h3>
+                        <span className="rounded-full bg-sage-500 px-2 py-0.5 text-xs font-semibold text-white">NEW</span>
+                      </div>
+                      <p className="text-grey-600 mb-6">Step-by-step guides to master Sage</p>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {howToGuides.map((guide) => {
+                          const Icon = guide.icon;
+                          return (
+                            <div key={guide.title} className="rounded-2xl border border-grey-200 bg-white p-5 transition-all hover:shadow-md hover:border-sage-200">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sage-100">
+                                  <Icon className="h-5 w-5 text-sage-600" />
+                                </div>
+                                <h4 className="font-semibold text-grey-900">{guide.title}</h4>
+                              </div>
+                              <ul className="space-y-2.5">
+                                {guide.tips.map((tip, i) => (
+                                  <li key={i} className="flex items-start gap-2 text-sm text-grey-600">
+                                    <CheckCircle2 className="h-4 w-4 mt-0.5 text-sage-500 flex-shrink-0" />
+                                    <span>{tip}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <WasThisHelpful section="how-to" />
                     </div>
                   )}
 
                   {/* FAQ */}
                   {activeSection === "faq" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Frequently Asked Questions</h3>
                       <p className="text-grey-600 mb-6">{faqs.length} questions answered</p>
-                      <FAQAccordion items={faqs} searchQuery="" />
+
+                      {/* FAQ Controls */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        {/* Category Filter Pills */}
+                        <div className="flex flex-wrap gap-2">
+                          {faqCategories.map((category) => (
+                            <button
+                              key={category}
+                              onClick={() => setFaqCategory(category)}
+                              className={cn(
+                                "rounded-full px-3 py-1.5 text-sm font-medium transition-all",
+                                faqCategory === category
+                                  ? "bg-sage-500 text-white"
+                                  : "bg-grey-100 text-grey-600 hover:bg-grey-200"
+                              )}
+                            >
+                              {category}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Expand/Collapse All */}
+                        <button
+                          onClick={() => setFaqAllExpanded(!faqAllExpanded)}
+                          className="flex items-center gap-2 text-sm font-medium text-sage-600 hover:text-sage-700"
+                        >
+                          {faqAllExpanded ? (
+                            <>
+                              <Minimize2 className="h-4 w-4" />
+                              Collapse All
+                            </>
+                          ) : (
+                            <>
+                              <Maximize2 className="h-4 w-4" />
+                              Expand All
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <FAQAccordion
+                        items={faqs}
+                        searchQuery=""
+                        selectedCategory={faqCategory}
+                        allExpanded={faqAllExpanded}
+                      />
+                      <WasThisHelpful section="faq" />
                     </div>
                   )}
 
                   {/* Keyboard Shortcuts */}
                   {activeSection === "shortcuts" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Keyboard Shortcuts</h3>
-                      <p className="text-grey-600 mb-6">Master these shortcuts to navigate Sage like a pro.</p>
+                      <p className="text-grey-600 mb-6">Master these shortcuts to navigate Sage like a pro. Hover over any row to copy the shortcut.</p>
                       <KeyboardShortcutTable shortcuts={keyboardShortcuts} />
 
                       <div className="mt-8 rounded-2xl border border-grey-200 bg-grey-50 p-6">
@@ -1257,12 +1581,13 @@ export default function HelpPage() {
                           </li>
                         </ul>
                       </div>
+                      <WasThisHelpful section="shortcuts" />
                     </div>
                   )}
 
                   {/* Troubleshooting */}
                   {activeSection === "troubleshooting" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Troubleshooting</h3>
                       <p className="text-grey-600 mb-6">Having issues? Find solutions to common problems below.</p>
                       <div className="space-y-4">
@@ -1290,19 +1615,20 @@ export default function HelpPage() {
                           );
                         })}
                       </div>
+                      <WasThisHelpful section="troubleshooting" />
                     </div>
                   )}
 
                   {/* Glossary */}
                   {activeSection === "glossary" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Glossary</h3>
                       <p className="text-grey-600 mb-6">Learn the terminology used throughout Sage.</p>
                       <div className="grid gap-4 sm:grid-cols-2">
                         {glossaryTerms.map((item, index) => {
                           const Icon = item.icon;
                           return (
-                            <div key={index} className="rounded-xl border border-grey-200 bg-white p-4 flex gap-4">
+                            <div key={index} className="rounded-xl border border-grey-200 bg-white p-4 flex gap-4 transition-all hover:shadow-sm hover:border-sage-200">
                               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sage-100 flex-shrink-0">
                                 <Icon className="h-5 w-5 text-sage-600" />
                               </div>
@@ -1314,21 +1640,29 @@ export default function HelpPage() {
                           );
                         })}
                       </div>
+                      <WasThisHelpful section="glossary" />
                     </div>
                   )}
 
                   {/* What's New */}
                   {activeSection === "whats-new" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">What's New</h3>
                       <p className="text-grey-600 mb-6">Latest updates and improvements to Sage.</p>
                       <div className="space-y-6">
                         {whatsNewItems.map((release, index) => (
                           <div key={index} className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
                             <div className="flex items-center justify-between border-b border-grey-100 bg-grey-50 px-6 py-4">
-                              <div>
-                                <h4 className="font-semibold text-grey-900">{release.title}</h4>
-                                <p className="text-sm text-grey-600">Version {release.version}</p>
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <h4 className="font-semibold text-grey-900">{release.title}</h4>
+                                  <p className="text-sm text-grey-600">Version {release.version}</p>
+                                </div>
+                                {release.isNew && (
+                                  <span className="rounded-full bg-sage-500 px-2 py-0.5 text-xs font-semibold text-white">
+                                    NEW
+                                  </span>
+                                )}
                               </div>
                               <span className="rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
                                 {release.date}
@@ -1347,12 +1681,13 @@ export default function HelpPage() {
                           </div>
                         ))}
                       </div>
+                      <WasThisHelpful section="whats-new" />
                     </div>
                   )}
 
                   {/* Privacy & Security */}
                   {activeSection === "privacy" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Privacy & Security</h3>
                       <p className="text-grey-600 mb-6">How we protect your data and privacy.</p>
 
@@ -1360,7 +1695,7 @@ export default function HelpPage() {
                         {privacyFeatures.map((feature, index) => {
                           const Icon = feature.icon;
                           return (
-                            <div key={index} className="rounded-xl border border-grey-200 bg-white p-5 flex gap-4">
+                            <div key={index} className="rounded-xl border border-grey-200 bg-white p-5 flex gap-4 transition-all hover:shadow-sm hover:border-sage-200">
                               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sage-100 flex-shrink-0">
                                 <Icon className="h-6 w-6 text-sage-600" />
                               </div>
@@ -1406,12 +1741,13 @@ export default function HelpPage() {
                           </div>
                         </div>
                       </div>
+                      <WasThisHelpful section="privacy" />
                     </div>
                   )}
 
                   {/* Account & Billing */}
                   {activeSection === "account" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-6">Account & Billing</h3>
 
                       <div className="space-y-6">
@@ -1482,12 +1818,13 @@ export default function HelpPage() {
                           </ul>
                         </div>
                       </div>
+                      <WasThisHelpful section="account" />
                     </div>
                   )}
 
                   {/* Contact */}
                   {activeSection === "contact" && (
-                    <div>
+                    <div className="animate-fade-in">
                       <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Contact Support</h3>
                       <p className="text-grey-600 mb-6">Need more help? We're here for you. Choose the best way to reach us.</p>
 
@@ -1569,6 +1906,7 @@ export default function HelpPage() {
                           Pro users receive priority support with faster response times.
                         </p>
                       </div>
+                      <WasThisHelpful section="contact" />
                     </div>
                   )}
                 </div>
