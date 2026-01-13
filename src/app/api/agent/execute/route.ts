@@ -210,12 +210,13 @@ async function createSteelSession(): Promise<SteelSession | null> {
   }
 }
 
-// Take a screenshot using Steel's scrape endpoint with screenshot option
-async function takeScreenshotViaScrape(url: string): Promise<string | null> {
+// Take a screenshot using a session - navigate then capture
+async function takeSessionScreenshot(sessionId: string, url: string): Promise<string | null> {
   if (!STEEL_API_KEY) return null;
 
   try {
-    const response = await fetch("https://api.steel.dev/v1/scrape", {
+    // First navigate to the URL using scrape (which navigates the session)
+    await fetch("https://api.steel.dev/v1/scrape", {
       method: "POST",
       headers: {
         "Steel-Api-Key": STEEL_API_KEY,
@@ -223,45 +224,48 @@ async function takeScreenshotViaScrape(url: string): Promise<string | null> {
       },
       body: JSON.stringify({
         url,
-        format: ["html"],
-        screenshot: true,
+        sessionId,
+        format: ["readability"],
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Steel scrape/screenshot failed:", response.status, errorText);
+    // Now take a screenshot of the session
+    const screenshotResponse = await fetch(`https://api.steel.dev/v1/sessions/${sessionId}/screenshot`, {
+      method: "GET",
+      headers: {
+        "Steel-Api-Key": STEEL_API_KEY,
+      },
+    });
+
+    if (!screenshotResponse.ok) {
+      console.error("Session screenshot failed:", screenshotResponse.status);
       return null;
     }
 
-    const data = await response.json();
-    console.log("Steel scrape response - all keys:", JSON.stringify(Object.keys(data)));
-    console.log("Steel scrape response - full data preview:", JSON.stringify(data).substring(0, 500));
+    // Check content type to determine format
+    const contentType = screenshotResponse.headers.get("content-type") || "";
+    console.log("Screenshot content-type:", contentType);
 
-    // Check various possible screenshot field names
-    const screenshot = data.screenshot || data.screenshotUrl || data.screenshot_url || data.image || data.imageUrl;
-
-    if (screenshot) {
-      console.log("Found screenshot field, type:", typeof screenshot, "length:", screenshot.length, "starts with:", screenshot.substring(0, 50));
-
-      // If it's a URL, fetch and convert to base64
-      if (screenshot.startsWith("http")) {
-        console.log("Screenshot is a URL, fetching...");
+    if (contentType.includes("image/")) {
+      // Binary image - convert to base64
+      const arrayBuffer = await screenshotResponse.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      console.log("Got binary screenshot, base64 length:", base64.length);
+      return base64;
+    } else {
+      // JSON response - might contain URL or base64
+      const data = await screenshotResponse.json();
+      console.log("Screenshot JSON response keys:", Object.keys(data));
+      const screenshot = data.screenshot || data.url || data.image;
+      if (screenshot?.startsWith("http")) {
         const imgResponse = await fetch(screenshot);
         const arrayBuffer = await imgResponse.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString("base64");
-        console.log("Converted URL to base64, length:", base64.length);
-        return base64;
+        return Buffer.from(arrayBuffer).toString("base64");
       }
-
-      // If it already looks like base64
-      return screenshot;
+      return screenshot || null;
     }
-
-    console.log("No screenshot field found in response");
-    return null;
   } catch (error) {
-    console.error("Screenshot error:", error);
+    console.error("Session screenshot error:", error);
     return null;
   }
 }
@@ -276,14 +280,18 @@ async function browsePage(
     return null;
   }
 
+  let screenshot: string | null = null;
+
   try {
-    // Take screenshot first (this also navigates to the page)
-    const screenshot = await takeScreenshotViaScrape(url);
-    if (screenshot) {
-      onScreenshot(screenshot);
+    // If we have a session, try to get a screenshot
+    if (sessionId) {
+      screenshot = await takeSessionScreenshot(sessionId, url);
+      if (screenshot) {
+        onScreenshot(screenshot);
+      }
     }
 
-    // Now scrape the page for content
+    // Scrape the page for content (this also navigates if no session screenshot was taken)
     const response = await fetch("https://api.steel.dev/v1/scrape", {
       method: "POST",
       headers: {
@@ -293,22 +301,33 @@ async function browsePage(
       body: JSON.stringify({
         url,
         sessionId,
-        format: "markdown",
+        format: ["markdown"],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Steel scrape failed:", response.status, errorText);
-      // Still return with screenshot if we have it
       return screenshot ? { content: "", screenshot: screenshot || undefined } : null;
     }
 
     const data = await response.json();
-    console.log("Steel scrape response keys:", Object.keys(data));
+
+    // Check if scrape response has a screenshot
+    if (!screenshot && data.screenshot) {
+      screenshot = data.screenshot;
+      if (screenshot?.startsWith("http")) {
+        const imgResponse = await fetch(screenshot);
+        const arrayBuffer = await imgResponse.arrayBuffer();
+        screenshot = Buffer.from(arrayBuffer).toString("base64");
+      }
+      if (screenshot) {
+        onScreenshot(screenshot);
+      }
+    }
 
     return {
-      content: data.content || data.markdown || "",
+      content: data.content || data.markdown || data.html || "",
       title: data.title || data.metadata?.title,
       screenshot: screenshot || undefined,
     };
