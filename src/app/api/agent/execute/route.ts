@@ -176,8 +176,6 @@ interface SteelScrapeResult {
   screenshot?: string;
 }
 
-let currentSteelSession: SteelSession | null = null;
-
 async function createSteelSession(): Promise<SteelSession | null> {
   if (!STEEL_API_KEY) {
     console.error("STEEL_API_KEY not configured");
@@ -212,32 +210,6 @@ async function createSteelSession(): Promise<SteelSession | null> {
   }
 }
 
-async function takeScreenshot(url: string, sessionId?: string): Promise<string | null> {
-  if (!STEEL_API_KEY) return null;
-
-  try {
-    const response = await fetch("https://api.steel.dev/v1/screenshot", {
-      method: "POST",
-      headers: {
-        "Steel-Api-Key": STEEL_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url,
-        sessionId,
-        fullPage: false,
-      }),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    return data.screenshot || null;
-  } catch {
-    return null;
-  }
-}
-
 async function browsePage(
   url: string,
   sessionId: string | undefined,
@@ -248,14 +220,8 @@ async function browsePage(
     return null;
   }
 
-  // Take initial screenshot immediately
-  const initialScreenshot = await takeScreenshot(url, sessionId);
-  if (initialScreenshot) {
-    onScreenshot(initialScreenshot);
-  }
-
-  // Start scraping (this navigates and extracts content)
   try {
+    // Use Steel's scrape endpoint which navigates, extracts content, and captures screenshot
     const response = await fetch("https://api.steel.dev/v1/scrape", {
       method: "POST",
       headers: {
@@ -266,26 +232,33 @@ async function browsePage(
         url,
         sessionId,
         format: "markdown",
-        screenshot: true, // Get screenshot with scrape
+        screenshot: true,
       }),
     });
 
     if (!response.ok) {
-      console.error("Steel scrape failed:", response.status);
+      const errorText = await response.text();
+      console.error("Steel scrape failed:", response.status, errorText);
       return null;
     }
 
     const data = await response.json();
+    console.log("Steel scrape response keys:", Object.keys(data));
 
-    // Send the final screenshot from scrape result
-    if (data.screenshot) {
-      onScreenshot(data.screenshot);
+    // Send the screenshot to the frontend
+    // Steel may return screenshot as 'screenshot' or 'image' depending on version
+    const screenshot = data.screenshot || data.image;
+    if (screenshot) {
+      console.log("Got screenshot, length:", screenshot.length);
+      onScreenshot(screenshot);
+    } else {
+      console.log("No screenshot in response");
     }
 
     return {
-      content: data.content || "",
-      title: data.title,
-      screenshot: data.screenshot,
+      content: data.content || data.markdown || "",
+      title: data.title || data.metadata?.title,
+      screenshot,
     };
   } catch (error) {
     console.error("Steel browse error:", error);
@@ -339,6 +312,7 @@ export async function POST(request: NextRequest) {
 
       let newFindingsContent = "";
       let latestSearchResults: SearchResult[] = [];
+      let steelSession: SteelSession | null = null;
 
       try {
         // Send thinking action immediately
@@ -496,13 +470,13 @@ Execute this step by searching for relevant information and documenting your fin
 
                 try {
                   // Create session if we don't have one
-                  if (!currentSteelSession) {
-                    currentSteelSession = await createSteelSession();
-                    if (currentSteelSession) {
+                  if (!steelSession) {
+                    steelSession = await createSteelSession();
+                    if (steelSession) {
                       // Send browser session info
                       sendEvent("browserState", {
-                        sessionId: currentSteelSession.id,
-                        liveViewUrl: currentSteelSession.sessionViewerUrl,
+                        sessionId: steelSession.id,
+                        liveViewUrl: steelSession.sessionViewerUrl,
                         currentUrl: url,
                         isActive: true,
                       });
@@ -518,7 +492,7 @@ Execute this step by searching for relevant information and documenting your fin
                   // Browse page with live screenshot streaming
                   const browseResult = await browsePage(
                     url,
-                    currentSteelSession?.id,
+                    steelSession?.id,
                     (screenshot) => {
                       // Stream each screenshot to the frontend
                       sendEvent("browserState", {
@@ -616,12 +590,12 @@ Execute this step by searching for relevant information and documenting your fin
         }
 
         // Release Steel session if we created one
-        if (currentSteelSession) {
-          await releaseSteelSession(currentSteelSession.id);
+        if (steelSession) {
+          await releaseSteelSession(steelSession.id);
           sendEvent("browserState", {
             isActive: false,
           });
-          currentSteelSession = null;
+          steelSession = null;
         }
 
         // Send step complete action
@@ -641,9 +615,9 @@ Execute this step by searching for relevant information and documenting your fin
         console.error("Agent execute error:", error);
 
         // Clean up Steel session on error
-        if (currentSteelSession) {
-          await releaseSteelSession(currentSteelSession.id);
-          currentSteelSession = null;
+        if (steelSession) {
+          await releaseSteelSession(steelSession.id);
+          steelSession = null;
         }
 
         sendEvent("action", {
