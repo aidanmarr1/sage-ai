@@ -152,9 +152,12 @@ export function ChatInput() {
 
       // It's a task - create conversation if authenticated and none exists
       let convId = currentConversationId;
+      console.log("Task detected. isAuthenticated:", isAuthenticated, "currentConvId:", convId);
       if (isAuthenticated && !convId) {
         const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
+        console.log("Creating conversation with title:", title);
         const conv = await createConversation(title);
+        console.log("Created conversation:", conv);
         if (conv) {
           convId = conv.id;
           clearMessages(); // Clear local messages for new conversation

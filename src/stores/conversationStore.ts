@@ -51,14 +51,17 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   createConversation: async (title: string) => {
     try {
+      console.log("API: Creating conversation...");
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title }),
       });
 
+      console.log("API response status:", res.status);
       if (res.ok) {
         const data = await res.json();
+        console.log("API response data:", data);
         const newConv = data.conversation;
         set((state) => ({
           conversations: [newConv, ...state.conversations],
@@ -66,6 +69,8 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         }));
         return newConv;
       }
+      const errorText = await res.text();
+      console.error("API error:", errorText);
       return null;
     } catch (error) {
       console.error("Failed to create conversation:", error);
