@@ -54,9 +54,9 @@ export function ReportCard() {
   return (
     <div
       className={cn(
-        "group rounded-2xl border transition-all duration-300",
+        "group rounded-2xl border transition-all duration-300 animate-slide-up",
         expanded
-          ? "border-sage-200 bg-white shadow-lg"
+          ? "border-sage-200 bg-white shadow-lg ring-1 ring-sage-100"
           : "border-grey-200 bg-gradient-to-br from-white to-grey-50 hover:border-sage-300 hover:shadow-md cursor-pointer"
       )}
     >
@@ -68,8 +68,11 @@ export function ReportCard() {
         )}
         onClick={() => !expanded && setExpanded(true)}
       >
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sage-500 to-sage-600 shadow-md shadow-sage-500/20">
+        <div className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sage-500 to-sage-600 shadow-md shadow-sage-500/20">
           <FileText className="h-6 w-6 text-white" />
+          <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-sage-100 text-[10px] font-bold text-sage-700 ring-2 ring-white">
+            ✓
+          </div>
         </div>
 
         <div className="flex-1 min-w-0">

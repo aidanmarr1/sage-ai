@@ -50,19 +50,30 @@ export function AuthModal({ isOpen }: AuthModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop - no click to close */}
-      <div className="absolute inset-0 bg-grey-900/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-grey-900/60 backdrop-blur-md" />
+
+      {/* Decorative orbs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/4 top-1/4 h-96 w-96 rounded-full bg-sage-300/20 blur-3xl" />
+        <div className="absolute right-1/4 bottom-1/4 h-96 w-96 rounded-full bg-sage-400/20 blur-3xl" />
+      </div>
 
       {/* Modal - no close button */}
-      <div className="relative w-full max-w-md animate-fade-in rounded-3xl bg-white p-8 shadow-2xl">
+      <div className="relative w-full max-w-md animate-scale-in rounded-3xl bg-white p-8 shadow-2xl ring-1 ring-grey-100">
+        {/* Decorative gradient at top */}
+        <div className="absolute left-0 right-0 top-0 h-1 rounded-t-3xl bg-gradient-to-r from-sage-400 via-sage-500 to-sage-400" />
+
         {/* Logo */}
         <div className="mb-6 flex justify-center">
-          <Image
-            src="/sage-logo.png"
-            alt="Sage"
-            width={120}
-            height={48}
-            className="h-12 w-auto object-contain"
-          />
+          <div className="animate-float">
+            <Image
+              src="/sage-logo.png"
+              alt="Sage"
+              width={120}
+              height={48}
+              className="h-12 w-auto object-contain"
+            />
+          </div>
         </div>
 
         {/* Title */}
@@ -97,7 +108,7 @@ export function AuthModal({ isOpen }: AuthModalProps) {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
                   required
-                  className="w-full rounded-xl border border-grey-200 bg-white py-3 pl-11 pr-4 text-grey-900 placeholder:text-grey-400 focus:border-sage-400 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                  className="w-full rounded-xl border border-grey-200 bg-white py-3 pl-11 pr-4 text-grey-900 placeholder:text-grey-400 transition-all focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-100/50 hover:border-grey-300"
                 />
               </div>
             </div>
@@ -115,7 +126,7 @@ export function AuthModal({ isOpen }: AuthModalProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                className="w-full rounded-xl border border-grey-200 bg-white py-3 pl-11 pr-4 text-grey-900 placeholder:text-grey-400 focus:border-sage-400 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                className="w-full rounded-xl border border-grey-200 bg-white py-3 pl-11 pr-4 text-grey-900 placeholder:text-grey-400 transition-all focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-100/50 hover:border-grey-300"
               />
             </div>
           </div>
@@ -133,7 +144,7 @@ export function AuthModal({ isOpen }: AuthModalProps) {
                 placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
                 required
                 minLength={6}
-                className="w-full rounded-xl border border-grey-200 bg-white py-3 pl-11 pr-4 text-grey-900 placeholder:text-grey-400 focus:border-sage-400 focus:outline-none focus:ring-2 focus:ring-sage-100"
+                className="w-full rounded-xl border border-grey-200 bg-white py-3 pl-11 pr-4 text-grey-900 placeholder:text-grey-400 transition-all focus:border-sage-400 focus:outline-none focus:ring-4 focus:ring-sage-100/50 hover:border-grey-300"
               />
             </div>
           </div>
@@ -141,7 +152,7 @@ export function AuthModal({ isOpen }: AuthModalProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sage-500 to-sage-600 py-3 font-medium text-white shadow-lg shadow-sage-500/25 transition-all hover:shadow-xl hover:shadow-sage-500/30 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sage-500 to-sage-600 py-3 font-medium text-white shadow-lg shadow-sage-500/25 transition-all hover:shadow-xl hover:shadow-sage-500/30 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
           >
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />

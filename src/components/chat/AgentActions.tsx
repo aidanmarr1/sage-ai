@@ -71,7 +71,7 @@ export function AgentActions() {
   }
 
   return (
-    <div className="flex flex-col gap-4 py-4">
+    <div className="flex flex-col gap-4 py-4 animate-fade-in">
       {stepIndices.map((stepIdx) => {
         const stepActions = groupedActions.get(stepIdx) || [];
         const stepContent = stepContents[stepIdx] || `Step ${stepIdx + 1}`;
@@ -79,16 +79,16 @@ export function AgentActions() {
         const isStepComplete = stepActions.some(a => a.type === "complete" && a.status === "completed");
 
         return (
-          <div key={stepIdx} className="flex flex-col gap-2">
+          <div key={stepIdx} className="flex flex-col gap-2 animate-fade-in-up" style={{ animationDelay: `${stepIdx * 100}ms` }}>
             {/* Step Header */}
             <div className={cn(
-              "flex items-center gap-2 text-sm font-medium",
+              "flex items-center gap-2 text-sm font-medium transition-colors",
               isCurrentStep ? "text-sage-700" : "text-grey-600"
             )}>
               <div className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
-                isStepComplete ? "bg-sage-500 text-white" :
-                isCurrentStep ? "bg-sage-100 text-sage-700" :
+                "flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold transition-all",
+                isStepComplete ? "bg-sage-500 text-white shadow-sm shadow-sage-500/30" :
+                isCurrentStep ? "bg-sage-100 text-sage-700 animate-glow-pulse" :
                 "bg-grey-100 text-grey-500"
               )}>
                 {isStepComplete ? (
@@ -134,9 +134,11 @@ export function AgentActions() {
 
       {/* Overall completion */}
       {!isExecuting && actions.length > 0 && (
-        <div className="flex items-center gap-2 pt-2 border-t border-grey-100 text-sm text-sage-600">
-          <CheckCircle2 className="h-4 w-4" />
-          <span>Research complete</span>
+        <div className="flex items-center gap-2 pt-3 mt-1 border-t border-grey-100 text-sm text-sage-600 animate-scale-in">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-sage-500 text-white shadow-sm shadow-sage-500/30">
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+          <span className="font-medium">Research complete</span>
         </div>
       )}
     </div>
