@@ -8,6 +8,7 @@ import { ChatPanel } from "@/components/chat";
 import { WorkspacePanel } from "@/components/workspace";
 import { AuthModal } from "@/components/auth";
 import { Sidebar } from "./Sidebar";
+import { MobileHeader } from "./MobileHeader";
 import { useKeyboardShortcuts } from "@/hooks";
 import { useSearchStore } from "@/stores/searchStore";
 import { useCommandPaletteStore } from "@/stores/commandPaletteStore";
@@ -21,6 +22,7 @@ export function MainLayout() {
   const { isOpen: isPaletteOpen, closePalette } = useCommandPaletteStore();
   const [mounted, setMounted] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -53,25 +55,48 @@ export function MainLayout() {
 
   return (
     <>
-      <div className="flex h-screen w-screen overflow-hidden bg-white">
-        {/* Sidebar */}
-        <Sidebar />
+      <div className="flex h-screen w-screen flex-col md:flex-row overflow-hidden bg-white">
+        {/* Mobile Header */}
+        <MobileHeader
+          onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          isMenuOpen={mobileMenuOpen}
+        />
+
+        {/* Mobile sidebar overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden fixed inset-0 top-14 z-40">
+            <div
+              className="absolute inset-0 bg-grey-900/50"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <div className="relative h-full w-64 animate-slide-in-left">
+              <Sidebar />
+            </div>
+          </div>
+        )}
+
+        {/* Sidebar - hidden on mobile */}
+        <div className="hidden md:block">
+          <Sidebar />
+        </div>
 
         {/* Main Content Area */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Left Panel - Chat */}
+          {/* Left Panel - Chat - full width on mobile */}
           <aside
-            className="flex-shrink-0 overflow-hidden border-r border-grey-200"
-            style={{ width: `${leftPanelWidth}%` }}
+            className="flex-shrink-0 overflow-hidden border-r border-grey-200 w-full md:w-auto"
+            style={{ width: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${leftPanelWidth}%` : '100%' }}
           >
             <ChatPanel />
           </aside>
 
-          {/* Resize Handle */}
-          <ResizeHandle orientation="vertical" onResize={handleResize} />
+          {/* Resize Handle - hidden on mobile */}
+          <div className="hidden md:block">
+            <ResizeHandle orientation="vertical" onResize={handleResize} />
+          </div>
 
-          {/* Right Panel - Workspace */}
-          <main className="flex flex-1 flex-col overflow-hidden bg-grey-50">
+          {/* Right Panel - Workspace - hidden on mobile */}
+          <main className="hidden md:flex flex-1 flex-col overflow-hidden bg-grey-50">
             <WorkspacePanel />
           </main>
         </div>

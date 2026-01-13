@@ -107,6 +107,43 @@ body {
   top: 0;
 }
 
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  /* Larger tap targets on mobile */
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better touch feedback */
+  button:active,
+  a:active {
+    transform: scale(0.98);
+  }
+
+  /* Prevent text selection during touch */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Smoother scrolling on iOS */
+  .scroll-smooth {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Touch device hover state fix */
+@media (hover: none) {
+  button:hover,
+  a:hover {
+    background-color: inherit;
+  }
+}
+
 /* Custom scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
