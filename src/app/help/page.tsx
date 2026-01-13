@@ -48,6 +48,23 @@ import {
   Heart,
   Coffee,
   ExternalLink,
+  Layout,
+  PanelLeft,
+  MessageCircle,
+  Layers,
+  Eye,
+  Lock,
+  Database,
+  History,
+  ChevronUp,
+  Circle,
+  Check,
+  Wand2,
+  MousePointer,
+  Maximize2,
+  Minimize2,
+  LayoutGrid,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -79,6 +96,85 @@ const quickStartSteps = [
     title: "Collaborate & Iterate",
     description: "Continue the conversation to refine and complete your task",
     icon: Sparkles,
+  },
+];
+
+const interfaceGuide = [
+  {
+    id: "sidebar",
+    title: "Sidebar",
+    icon: PanelLeft,
+    description: "Your navigation hub for tasks and settings",
+    features: [
+      { name: "New Task", description: "Start a fresh conversation with Sage" },
+      { name: "Recent Tasks", description: "Quick access to your latest conversations" },
+      { name: "Search", description: "Find any task by keyword" },
+      { name: "Navigation", description: "Access Home, Tasks, History, Help, and Settings" },
+    ],
+  },
+  {
+    id: "chat",
+    title: "Chat Area",
+    icon: MessageCircle,
+    description: "Where you interact with Sage",
+    features: [
+      { name: "Message Input", description: "Type your questions or requests here" },
+      { name: "Image Attachments", description: "Click paperclip to add images" },
+      { name: "Emoji Picker", description: "Add emojis to your messages" },
+      { name: "Send Button", description: "Press Enter or click to send" },
+    ],
+  },
+  {
+    id: "workspace",
+    title: "Workspace Panel",
+    icon: Layers,
+    description: "Tools and outputs for complex tasks",
+    features: [
+      { name: "Computer", description: "Visual workspace for the AI agent" },
+      { name: "Plan", description: "Step-by-step breakdown of your task" },
+      { name: "Terminal", description: "Command execution output" },
+      { name: "Files", description: "File browser for agent workspace" },
+    ],
+  },
+];
+
+const exampleConversations = [
+  {
+    type: "Research Task",
+    color: "sage",
+    messages: [
+      { role: "user", content: "Help me research the best productivity apps for remote work" },
+      { role: "assistant", content: "I'll help you find the best productivity apps for remote work. Let me create a plan to research and compare the top options for you." },
+    ],
+    planSteps: [
+      "Research top-rated productivity apps for remote teams",
+      "Compare features, pricing, and user reviews",
+      "Categorize by use case (communication, project management, etc.)",
+      "Create a summary with recommendations",
+    ],
+  },
+  {
+    type: "Writing Task",
+    color: "sage",
+    messages: [
+      { role: "user", content: "Write a professional email to decline a job offer politely" },
+      { role: "assistant", content: "I'll help you craft a professional and courteous email to decline the job offer while maintaining a positive relationship." },
+    ],
+    planSteps: [
+      "Express gratitude for the offer and their time",
+      "Clearly but politely state your decision",
+      "Provide a brief, professional reason (optional)",
+      "Keep the door open for future opportunities",
+    ],
+  },
+  {
+    type: "Simple Greeting",
+    color: "grey",
+    messages: [
+      { role: "user", content: "Hey! How's it going?" },
+      { role: "assistant", content: "Hey there! I'm doing great, thanks for asking! I'm Sage, your AI assistant, and I'm ready to help with whatever you need. Whether it's research, writing, planning, or problem-solving - just let me know what's on your mind!" },
+    ],
+    planSteps: null,
   },
 ];
 
@@ -190,66 +286,125 @@ const proTips = [
   },
 ];
 
+const advancedTips = [
+  {
+    tip: "Use Specific Formats",
+    description: "Ask for output in specific formats: 'Give me a bullet list', 'Write this as a table', 'Format as JSON'",
+    icon: FileText,
+  },
+  {
+    tip: "Set the Tone",
+    description: "Specify the tone: 'Make it professional', 'Keep it casual', 'Write for executives', 'Explain like I'm 5'",
+    icon: Wand2,
+  },
+  {
+    tip: "Iterate Quickly",
+    description: "Say 'Make it shorter', 'Add more detail', or 'Try a different approach' to refine outputs",
+    icon: ArrowRight,
+  },
+  {
+    tip: "Provide Examples",
+    description: "Share examples of what you want: 'Write something like this but for...' helps Sage understand your style",
+    icon: Eye,
+  },
+];
+
 const faqs = [
   {
     question: "What exactly is Sage?",
     answer: "Sage is a general-purpose AI agent - not just a chatbot. It can understand complex requests, create actionable plans, and help you work through multi-step problems. Whether you need help with research, writing, coding, planning, or creative tasks, Sage adapts to your needs and provides intelligent assistance.",
+    category: "General",
   },
   {
     question: "What's the difference between Sage and other AI chatbots?",
     answer: "Unlike simple chatbots that just respond to messages, Sage is designed as an AI agent that can plan, reason, and execute tasks. When you give Sage an actionable request, it creates a structured plan with clear steps. Sage also has access to workspace tools like a terminal, file browser, and visual display for more complex tasks.",
+    category: "General",
   },
   {
     question: "Why doesn't every message create a plan?",
     answer: "Sage is smart enough to distinguish between casual conversation and actionable requests. If you say 'hi' or 'how are you', Sage responds conversationally. But when you ask something like 'help me write a business plan' or 'research the best laptops under $1000', Sage recognizes this as a task and generates a structured plan to help you accomplish it.",
+    category: "Features",
   },
   {
     question: "Can Sage remember our previous conversations?",
     answer: "Yes! Each task/conversation is saved to your account. When you click on a task in the sidebar, Sage loads the entire conversation history. This means you can pick up where you left off, ask follow-up questions, or continue working on the same project days later.",
+    category: "Features",
   },
   {
     question: "What types of files can I attach?",
     answer: "Currently, Sage supports image attachments (PNG, JPG, GIF, WebP, etc.). You can attach images by clicking the paperclip icon or by dragging and dropping directly into the chat. This is great for getting feedback on designs, explaining visual concepts, or sharing screenshots.",
+    category: "Features",
   },
   {
     question: "Is there a limit to how much I can use Sage?",
     answer: "The Free Plan includes 50 tasks per day, which resets at midnight. Each task can have unlimited messages within it. If you need more, you can upgrade to Pro for unlimited tasks and additional features.",
+    category: "Account",
   },
   {
     question: "How is my data protected?",
     answer: "Your conversations are private and encrypted. Only you can access your tasks when signed in. We don't share your conversation data with third parties or use it to train models without consent. You can delete any task at any time.",
+    category: "Privacy",
   },
   {
     question: "Can I use Sage for work/commercial purposes?",
     answer: "Absolutely! Sage is designed for both personal and professional use. Many users rely on Sage for business tasks like writing proposals, analyzing data, planning projects, and more. The Pro plan is especially suited for professional use with unlimited tasks.",
+    category: "Account",
   },
   {
     question: "What should I do if Sage gives an incorrect answer?",
     answer: "While Sage strives for accuracy, it can sometimes make mistakes. If you notice an error, simply point it out in the conversation - say something like 'That's not quite right, can you reconsider?' Sage will acknowledge the feedback and provide a corrected response.",
+    category: "Usage",
   },
   {
     question: "Can Sage browse the internet or access external websites?",
     answer: "Sage has knowledge up to its training date and can provide information based on that. For the most current information on rapidly changing topics, it's always good to verify with up-to-date sources. Sage can help you understand what to look for and how to evaluate information.",
+    category: "Features",
   },
   {
     question: "How do I get the best results from Sage?",
     answer: "Be specific and provide context! Instead of 'write an email', try 'write a professional email to my manager requesting a meeting to discuss my project timeline, keeping a friendly but formal tone'. The more details you provide about your goals, audience, and constraints, the better Sage can help.",
+    category: "Usage",
   },
   {
     question: "Can multiple people use the same Sage account?",
     answer: "Each Sage account is designed for individual use. For teams and organizations, we're working on team plans that will allow collaboration features. For now, each person should have their own account for the best experience.",
+    category: "Account",
+  },
+  {
+    question: "How do I delete a task?",
+    answer: "Hover over any task in the sidebar's Recent section and click the trash icon that appears. This will permanently delete the task and all its messages. Note: This action cannot be undone.",
+    category: "Features",
+  },
+  {
+    question: "Can I export my conversations?",
+    answer: "Export functionality is coming soon. We're working on allowing you to export your tasks in various formats (PDF, Markdown, etc.) for record-keeping or sharing purposes.",
+    category: "Features",
+  },
+  {
+    question: "Does Sage work on mobile?",
+    answer: "Yes! Sage is fully responsive and works on all devices. While we recommend using a desktop for complex tasks, you can easily chat with Sage on your phone or tablet for quick questions and simple tasks.",
+    category: "General",
+  },
+  {
+    question: "What languages does Sage support?",
+    answer: "Sage can understand and respond in many languages. While English is the primary language with the best performance, you can communicate in Spanish, French, German, Japanese, Chinese, and many more languages.",
+    category: "Features",
   },
 ];
 
 const keyboardShortcuts = [
-  { keys: ["⌘", "N"], action: "New Task", description: "Start a new task/conversation" },
-  { keys: ["⌘", "K"], action: "Search", description: "Open search dialog" },
-  { keys: ["⌘", "B"], action: "Toggle Sidebar", description: "Collapse or expand the sidebar" },
-  { keys: ["⌘", "\\"], action: "Toggle Workspace", description: "Show or hide the workspace panel" },
-  { keys: ["Enter"], action: "Send Message", description: "Send your current message" },
-  { keys: ["Shift", "Enter"], action: "New Line", description: "Add a new line without sending" },
-  { keys: ["⌘", "↑"], action: "Previous Message", description: "Edit your previous message" },
-  { keys: ["Esc"], action: "Cancel", description: "Cancel current action or close dialogs" },
+  { keys: ["⌘", "N"], action: "New Task", description: "Start a new task/conversation", category: "Navigation" },
+  { keys: ["⌘", "K"], action: "Search", description: "Open search dialog", category: "Navigation" },
+  { keys: ["⌘", "B"], action: "Toggle Sidebar", description: "Collapse or expand the sidebar", category: "Navigation" },
+  { keys: ["⌘", "\\"], action: "Toggle Workspace", description: "Show or hide the workspace panel", category: "Navigation" },
+  { keys: ["Enter"], action: "Send Message", description: "Send your current message", category: "Chat" },
+  { keys: ["Shift", "Enter"], action: "New Line", description: "Add a new line without sending", category: "Chat" },
+  { keys: ["⌘", "↑"], action: "Previous Message", description: "Edit your previous message", category: "Chat" },
+  { keys: ["Esc"], action: "Cancel", description: "Cancel current action or close dialogs", category: "General" },
+  { keys: ["⌘", ","], action: "Settings", description: "Open settings page", category: "Navigation" },
+  { keys: ["?"], action: "Help", description: "Open this help page", category: "Navigation" },
+  { keys: ["H"], action: "Home", description: "Go to home page", category: "Navigation" },
+  { keys: ["T"], action: "Tasks", description: "View all tasks", category: "Navigation" },
 ];
 
 const troubleshootingItems = [
@@ -321,20 +476,220 @@ const troubleshootingItems = [
       "Try refreshing the page",
     ],
   },
+  {
+    problem: "Slow responses",
+    icon: Clock,
+    severity: "common",
+    solutions: [
+      "Complex tasks may take longer - this is normal for detailed requests",
+      "Check your internet connection speed",
+      "Try simplifying your request if it's very long",
+      "During peak hours, responses may take slightly longer",
+    ],
+  },
 ];
 
 const glossaryTerms = [
-  { term: "Task", definition: "A conversation or project in Sage. Each time you start something new, it creates a task that's saved to your sidebar." },
-  { term: "Plan", definition: "A structured, step-by-step breakdown that Sage creates for actionable requests. Plans help organize complex tasks into manageable steps." },
-  { term: "Workspace", definition: "The right panel containing Computer, Plan, Terminal, and Files tabs. This is where Sage's tools and outputs are displayed." },
-  { term: "Agent", definition: "Sage is an AI agent - more than a chatbot. Agents can plan, reason, use tools, and complete multi-step tasks autonomously." },
-  { term: "Actionable Request", definition: "A message that asks Sage to do something specific, like writing, researching, or planning. These trigger plan generation." },
-  { term: "Conversational Message", definition: "Casual messages like greetings that don't require a structured response or plan." },
+  { term: "Task", definition: "A conversation or project in Sage. Each time you start something new, it creates a task that's saved to your sidebar.", icon: FileText },
+  { term: "Plan", definition: "A structured, step-by-step breakdown that Sage creates for actionable requests. Plans help organize complex tasks into manageable steps.", icon: ListChecks },
+  { term: "Workspace", definition: "The right panel containing Computer, Plan, Terminal, and Files tabs. This is where Sage's tools and outputs are displayed.", icon: Layout },
+  { term: "Agent", definition: "Sage is an AI agent - more than a chatbot. Agents can plan, reason, use tools, and complete multi-step tasks autonomously.", icon: Sparkles },
+  { term: "Actionable Request", definition: "A message that asks Sage to do something specific, like writing, researching, or planning. These trigger plan generation.", icon: Target },
+  { term: "Conversational Message", definition: "Casual messages like greetings that don't require a structured response or plan.", icon: MessageCircle },
+  { term: "Starring", definition: "Marking a task as important by clicking the star icon. Starred tasks appear at the top of your task list.", icon: Star },
+  { term: "Context", definition: "The information Sage uses to understand your request. More context leads to better, more relevant responses.", icon: Brain },
+];
+
+const whatsNewItems = [
+  {
+    version: "1.2.0",
+    date: "January 2025",
+    title: "Enhanced Task Management",
+    highlights: [
+      "Star important tasks for quick access",
+      "Improved sidebar navigation",
+      "Better task search functionality",
+      "Faster message loading",
+    ],
+  },
+  {
+    version: "1.1.0",
+    date: "December 2024",
+    title: "Image Attachments",
+    highlights: [
+      "Attach images to your messages",
+      "Support for PNG, JPG, GIF, WebP",
+      "Drag and drop support",
+      "Image preview before sending",
+    ],
+  },
+  {
+    version: "1.0.0",
+    date: "November 2024",
+    title: "Initial Launch",
+    highlights: [
+      "AI-powered task assistance",
+      "Smart plan generation",
+      "Conversation history",
+      "Workspace with multiple tools",
+    ],
+  },
+];
+
+const privacyFeatures = [
+  {
+    title: "End-to-End Encryption",
+    description: "All your conversations are encrypted in transit and at rest",
+    icon: Lock,
+  },
+  {
+    title: "Private by Default",
+    description: "Only you can access your tasks and conversations",
+    icon: Shield,
+  },
+  {
+    title: "Data Ownership",
+    description: "You own your data and can delete it at any time",
+    icon: Database,
+  },
+  {
+    title: "No Data Selling",
+    description: "We never sell your data to third parties",
+    icon: XCircle,
+  },
+];
+
+const onboardingChecklist = [
+  { id: "account", label: "Create your account", description: "Sign up with email or Google" },
+  { id: "first-task", label: "Start your first task", description: "Ask Sage anything to get started" },
+  { id: "explore-plan", label: "Explore a generated plan", description: "See how Sage breaks down complex tasks" },
+  { id: "star-task", label: "Star an important task", description: "Keep your favorites easy to find" },
+  { id: "try-image", label: "Try attaching an image", description: "Add visual context to your requests" },
+  { id: "use-shortcut", label: "Use a keyboard shortcut", description: "Try ⌘+N to start a new task" },
 ];
 
 // ============================================================================
 // COMPONENTS
 // ============================================================================
+
+function OnboardingChecklist() {
+  const [completed, setCompleted] = useState<string[]>([]);
+
+  const toggleItem = (id: string) => {
+    setCompleted(prev =>
+      prev.includes(id)
+        ? prev.filter(item => item !== id)
+        : [...prev, id]
+    );
+  };
+
+  const progress = (completed.length / onboardingChecklist.length) * 100;
+
+  return (
+    <div className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
+      <div className="border-b border-grey-100 bg-gradient-to-r from-sage-50 to-white p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold text-grey-900">Getting Started Checklist</h4>
+          <span className="text-sm font-medium text-sage-600">
+            {completed.length}/{onboardingChecklist.length} complete
+          </span>
+        </div>
+        <div className="h-2 bg-grey-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-sage-400 to-sage-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+      <div className="p-2">
+        {onboardingChecklist.map((item) => {
+          const isComplete = completed.includes(item.id);
+          return (
+            <button
+              key={item.id}
+              onClick={() => toggleItem(item.id)}
+              className={cn(
+                "w-full flex items-start gap-3 rounded-xl p-3 text-left transition-all",
+                isComplete ? "bg-sage-50" : "hover:bg-grey-50"
+              )}
+            >
+              <div className={cn(
+                "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-all",
+                isComplete
+                  ? "border-sage-500 bg-sage-500"
+                  : "border-grey-300"
+              )}>
+                {isComplete && <Check className="h-3.5 w-3.5 text-white" />}
+              </div>
+              <div>
+                <p className={cn(
+                  "font-medium transition-all",
+                  isComplete ? "text-sage-700 line-through" : "text-grey-900"
+                )}>
+                  {item.label}
+                </p>
+                <p className="text-sm text-grey-500">{item.description}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ExampleConversation({ example }: { example: typeof exampleConversations[0] }) {
+  return (
+    <div className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
+      <div className="border-b border-grey-100 bg-grey-50 px-5 py-3">
+        <span className={cn(
+          "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
+          example.planSteps ? "bg-sage-100 text-sage-700" : "bg-grey-200 text-grey-600"
+        )}>
+          {example.planSteps ? <ListChecks className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
+          {example.type}
+        </span>
+      </div>
+      <div className="p-4 space-y-3">
+        {example.messages.map((msg, i) => (
+          <div key={i} className={cn("flex gap-3", msg.role === "user" ? "justify-end" : "")}>
+            {msg.role === "assistant" && (
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-sage-400 to-sage-600 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+            )}
+            <div className={cn(
+              "rounded-2xl px-4 py-2.5 max-w-[80%]",
+              msg.role === "user"
+                ? "bg-grey-900 text-white"
+                : "bg-grey-100 text-grey-800"
+            )}>
+              <p className="text-sm">{msg.content}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      {example.planSteps && (
+        <div className="border-t border-grey-100 bg-sage-50/50 p-4">
+          <p className="text-xs font-medium text-sage-700 mb-2 flex items-center gap-1.5">
+            <ListChecks className="h-3.5 w-3.5" />
+            Generated Plan
+          </p>
+          <ol className="space-y-1.5">
+            {example.planSteps.map((step, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-grey-600">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sage-200 text-xs font-medium text-sage-700 flex-shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FAQAccordion({ items, searchQuery }: { items: typeof faqs; searchQuery: string }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -368,7 +723,12 @@ function FAQAccordion({ items, searchQuery }: { items: typeof faqs; searchQuery:
             onClick={() => setOpenIndex(openIndex === index ? null : index)}
             className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-grey-50"
           >
-            <span className="font-medium text-grey-900 pr-4">{item.question}</span>
+            <div className="flex items-center gap-3 pr-4">
+              <span className="rounded-full bg-sage-100 px-2 py-0.5 text-xs font-medium text-sage-700">
+                {item.category}
+              </span>
+              <span className="font-medium text-grey-900">{item.question}</span>
+            </div>
             <ChevronDown
               className={cn(
                 "h-5 w-5 flex-shrink-0 text-grey-400 transition-transform duration-200",
@@ -404,6 +764,8 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
     })),
     ...glossaryTerms.map((g) => ({ type: "Glossary", title: g.term, content: g.definition })),
     ...proTips.map((t) => ({ type: "Tip", title: t.tip, content: t.description })),
+    ...advancedTips.map((t) => ({ type: "Advanced Tip", title: t.tip, content: t.description })),
+    ...useCases.flatMap((c) => c.examples.map(e => ({ type: "Example", title: c.category, content: e }))),
   ];
 
   const results = allContent.filter(
@@ -446,7 +808,7 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
         </button>
       </div>
       <div className="space-y-3">
-        {results.slice(0, 10).map((result, index) => (
+        {results.slice(0, 15).map((result, index) => (
           <div
             key={index}
             className="rounded-xl border border-grey-200 bg-white p-4 transition-shadow hover:shadow-sm"
@@ -465,6 +827,49 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
   );
 }
 
+function KeyboardShortcutTable({ shortcuts }: { shortcuts: typeof keyboardShortcuts }) {
+  const categories = [...new Set(shortcuts.map(s => s.category))];
+
+  return (
+    <div className="space-y-6">
+      {categories.map(category => (
+        <div key={category}>
+          <h4 className="font-medium text-grey-700 mb-3 flex items-center gap-2">
+            <Keyboard className="h-4 w-4" />
+            {category}
+          </h4>
+          <div className="overflow-hidden rounded-xl border border-grey-200 bg-white">
+            <table className="w-full">
+              <tbody className="divide-y divide-grey-100">
+                {shortcuts.filter(s => s.category === category).map((shortcut, index) => (
+                  <tr key={index} className="bg-white transition-colors hover:bg-grey-50">
+                    <td className="px-5 py-3 w-40">
+                      <div className="flex items-center gap-1.5">
+                        {shortcut.keys.map((key, i) => (
+                          <span key={i} className="flex items-center">
+                            <kbd className="rounded-lg bg-grey-100 px-2.5 py-1.5 text-xs font-semibold text-grey-700 shadow-sm ring-1 ring-grey-200">
+                              {key}
+                            </kbd>
+                            {i < shortcut.keys.length - 1 && (
+                              <span className="mx-1 text-grey-400">+</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 font-medium text-grey-900">{shortcut.action}</td>
+                    <td className="hidden sm:table-cell px-5 py-3 text-grey-600">{shortcut.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -472,15 +877,28 @@ function SearchResults({ query, onClear }: { query: string; onClear: () => void 
 export default function HelpPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSection, setActiveSection] = useState<string | null>("quick-start");
+  const [activeSection, setActiveSection] = useState<string>("interface");
 
   const isSearching = searchQuery.length > 2;
+
+  const navItems = [
+    { id: "interface", label: "Interface Guide", icon: Layout },
+    { id: "examples", label: "Example Conversations", icon: MessageCircle },
+    { id: "faq", label: "FAQ", icon: HelpCircle },
+    { id: "shortcuts", label: "Keyboard Shortcuts", icon: Keyboard },
+    { id: "troubleshooting", label: "Troubleshooting", icon: AlertTriangle },
+    { id: "glossary", label: "Glossary", icon: BookOpen },
+    { id: "whats-new", label: "What's New", icon: Sparkles },
+    { id: "privacy", label: "Privacy & Security", icon: Shield },
+    { id: "account", label: "Account & Billing", icon: CreditCard },
+    { id: "contact", label: "Contact Support", icon: Mail },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sage-50/30 via-white to-grey-50/50">
       {/* Header */}
       <header className="sticky top-0 z-20 border-b border-grey-200/80 bg-white/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <button
             onClick={() => router.push("/")}
             className="flex h-10 w-10 items-center justify-center rounded-xl text-grey-600 transition-all hover:bg-grey-100 hover:text-grey-900"
@@ -503,13 +921,14 @@ export default function HelpPage() {
       {/* Hero Section */}
       <div className="relative overflow-hidden border-b border-grey-100 bg-gradient-to-br from-sage-50 via-white to-sage-50/30">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(132,169,140,0.1),transparent_50%)]" />
-        <div className="relative mx-auto max-w-5xl px-4 py-12 sm:py-16">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(132,169,140,0.08),transparent_50%)]" />
+        <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-16">
           <div className="text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-sm ring-1 ring-grey-200/50">
               <Sparkles className="h-4 w-4 text-sage-600" />
               <span className="text-sm font-medium text-grey-700">Welcome to Sage Help Center</span>
             </div>
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-grey-900 mb-4">
+            <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-grey-900 mb-4">
               How can we help you today?
             </h2>
             <p className="text-lg text-grey-600 mb-8 max-w-2xl mx-auto">
@@ -535,6 +954,25 @@ export default function HelpPage() {
                 </button>
               )}
             </div>
+
+            {/* Quick Links */}
+            <div className="flex flex-wrap justify-center gap-2 mt-6">
+              {["Getting Started", "Keyboard Shortcuts", "Troubleshooting", "FAQ"].map((link) => (
+                <button
+                  key={link}
+                  onClick={() => {
+                    setSearchQuery("");
+                    const sectionId = link.toLowerCase().replace(" ", "-");
+                    if (sectionId === "getting-started") setActiveSection("interface");
+                    else if (sectionId === "keyboard-shortcuts") setActiveSection("shortcuts");
+                    else setActiveSection(sectionId);
+                  }}
+                  className="rounded-full bg-white px-4 py-2 text-sm font-medium text-grey-600 shadow-sm ring-1 ring-grey-200 transition-all hover:bg-sage-50 hover:text-sage-700 hover:ring-sage-200"
+                >
+                  {link}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -547,7 +985,7 @@ export default function HelpPage() {
       ) : (
         <>
           {/* Quick Start Section */}
-          <div className="mx-auto max-w-5xl px-4 py-12">
+          <div className="mx-auto max-w-6xl px-4 py-12">
             <div className="mb-8 text-center">
               <h3 className="font-serif text-2xl font-bold text-grey-900 mb-2">Quick Start Guide</h3>
               <p className="text-grey-600">Get up and running with Sage in 4 simple steps</p>
@@ -581,7 +1019,7 @@ export default function HelpPage() {
 
           {/* Use Cases Section */}
           <div className="border-y border-grey-100 bg-grey-50/50 py-12">
-            <div className="mx-auto max-w-5xl px-4">
+            <div className="mx-auto max-w-6xl px-4">
               <div className="mb-8 text-center">
                 <h3 className="font-serif text-2xl font-bold text-grey-900 mb-2">What Can Sage Help With?</h3>
                 <p className="text-grey-600">Explore different ways to use Sage with example prompts</p>
@@ -616,12 +1054,12 @@ export default function HelpPage() {
           </div>
 
           {/* Pro Tips Section */}
-          <div className="mx-auto max-w-5xl px-4 py-12">
+          <div className="mx-auto max-w-6xl px-4 py-12">
             <div className="mb-8 text-center">
               <h3 className="font-serif text-2xl font-bold text-grey-900 mb-2">Pro Tips</h3>
               <p className="text-grey-600">Get the most out of Sage with these expert tips</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
               {proTips.map((tip) => {
                 const Icon = tip.icon;
                 return (
@@ -640,52 +1078,154 @@ export default function HelpPage() {
                 );
               })}
             </div>
+
+            {/* Advanced Tips */}
+            <div className="rounded-2xl border border-sage-200 bg-gradient-to-br from-sage-50 to-white p-6">
+              <h4 className="font-semibold text-sage-900 mb-4 flex items-center gap-2">
+                <Zap className="h-5 w-5 text-sage-600" />
+                Advanced Tips
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {advancedTips.map((tip) => {
+                  const Icon = tip.icon;
+                  return (
+                    <div key={tip.tip} className="flex gap-3">
+                      <Icon className="h-5 w-5 text-sage-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sage-800">{tip.tip}</p>
+                        <p className="text-sm text-sage-600">{tip.description}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Main Content Sections */}
           <div className="border-t border-grey-100 bg-grey-50/30 py-12">
-            <div className="mx-auto max-w-5xl px-4">
-              <div className="grid gap-8 lg:grid-cols-3">
+            <div className="mx-auto max-w-6xl px-4">
+              <div className="grid gap-8 lg:grid-cols-4">
                 {/* Sidebar Navigation */}
                 <div className="lg:col-span-1">
-                  <div className="sticky top-20">
-                    <h4 className="font-semibold text-grey-900 mb-4 px-2">Help Topics</h4>
-                    <nav className="space-y-1">
-                      {[
-                        { id: "faq", label: "Frequently Asked Questions", icon: HelpCircle },
-                        { id: "shortcuts", label: "Keyboard Shortcuts", icon: Keyboard },
-                        { id: "troubleshooting", label: "Troubleshooting", icon: AlertTriangle },
-                        { id: "glossary", label: "Glossary", icon: BookOpen },
-                        { id: "account", label: "Account & Billing", icon: CreditCard },
-                        { id: "contact", label: "Contact Support", icon: Mail },
-                      ].map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => setActiveSection(item.id)}
-                            className={cn(
-                              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all",
-                              activeSection === item.id
-                                ? "bg-sage-100 text-sage-800"
-                                : "text-grey-600 hover:bg-grey-100 hover:text-grey-900"
-                            )}
-                          >
-                            <Icon className="h-4 w-4" />
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </nav>
+                  <div className="sticky top-20 space-y-6">
+                    <div>
+                      <h4 className="font-semibold text-grey-900 mb-4 px-2">Help Topics</h4>
+                      <nav className="space-y-1">
+                        {navItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => setActiveSection(item.id)}
+                              className={cn(
+                                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all",
+                                activeSection === item.id
+                                  ? "bg-sage-100 text-sage-800"
+                                  : "text-grey-600 hover:bg-grey-100 hover:text-grey-900"
+                              )}
+                            >
+                              <Icon className="h-4 w-4" />
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </nav>
+                    </div>
+
+                    {/* Onboarding Checklist */}
+                    <OnboardingChecklist />
                   </div>
                 </div>
 
                 {/* Content Area */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-3">
+                  {/* Interface Guide */}
+                  {activeSection === "interface" && (
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Interface Guide</h3>
+                      <p className="text-grey-600 mb-6">Learn your way around Sage's interface</p>
+
+                      <div className="space-y-6">
+                        {interfaceGuide.map((section) => {
+                          const Icon = section.icon;
+                          return (
+                            <div key={section.id} className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
+                              <div className="flex items-center gap-4 border-b border-grey-100 bg-grey-50 px-6 py-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sage-100">
+                                  <Icon className="h-6 w-6 text-sage-600" />
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-grey-900">{section.title}</h4>
+                                  <p className="text-sm text-grey-600">{section.description}</p>
+                                </div>
+                              </div>
+                              <div className="p-6">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  {section.features.map((feature, i) => (
+                                    <div key={i} className="flex gap-3">
+                                      <CheckCircle2 className="h-5 w-5 text-sage-500 flex-shrink-0 mt-0.5" />
+                                      <div>
+                                        <p className="font-medium text-grey-900">{feature.name}</p>
+                                        <p className="text-sm text-grey-600">{feature.description}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Example Conversations */}
+                  {activeSection === "examples" && (
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Example Conversations</h3>
+                      <p className="text-grey-600 mb-6">See how Sage responds to different types of requests</p>
+
+                      <div className="space-y-6">
+                        {exampleConversations.map((example, index) => (
+                          <ExampleConversation key={index} example={example} />
+                        ))}
+                      </div>
+
+                      <div className="mt-8 rounded-2xl border border-sage-200 bg-sage-50 p-6">
+                        <h4 className="font-semibold text-sage-900 mb-3 flex items-center gap-2">
+                          <Lightbulb className="h-5 w-5" />
+                          Understanding the Difference
+                        </h4>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-xl bg-white p-4 border border-sage-200">
+                            <p className="font-medium text-sage-800 mb-2 flex items-center gap-2">
+                              <ListChecks className="h-4 w-4" />
+                              Actionable Requests
+                            </p>
+                            <p className="text-sm text-sage-600">
+                              Tasks, questions, and requests that need structured help trigger plan generation.
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-white p-4 border border-grey-200">
+                            <p className="font-medium text-grey-800 mb-2 flex items-center gap-2">
+                              <MessageCircle className="h-4 w-4" />
+                              Conversational Messages
+                            </p>
+                            <p className="text-sm text-grey-600">
+                              Simple greetings and casual chat get friendly responses without plans.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* FAQ */}
                   {activeSection === "faq" && (
                     <div>
-                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-6">Frequently Asked Questions</h3>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Frequently Asked Questions</h3>
+                      <p className="text-grey-600 mb-6">{faqs.length} questions answered</p>
                       <FAQAccordion items={faqs} searchQuery="" />
                     </div>
                   )}
@@ -693,40 +1233,29 @@ export default function HelpPage() {
                   {/* Keyboard Shortcuts */}
                   {activeSection === "shortcuts" && (
                     <div>
-                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-6">Keyboard Shortcuts</h3>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Keyboard Shortcuts</h3>
                       <p className="text-grey-600 mb-6">Master these shortcuts to navigate Sage like a pro.</p>
-                      <div className="overflow-hidden rounded-2xl border border-grey-200 bg-white">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b border-grey-100 bg-grey-50">
-                              <th className="px-5 py-3 text-left text-sm font-semibold text-grey-700">Shortcut</th>
-                              <th className="px-5 py-3 text-left text-sm font-semibold text-grey-700">Action</th>
-                              <th className="hidden sm:table-cell px-5 py-3 text-left text-sm font-semibold text-grey-700">Description</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-grey-100">
-                            {keyboardShortcuts.map((shortcut, index) => (
-                              <tr key={index} className="bg-white transition-colors hover:bg-grey-50">
-                                <td className="px-5 py-3">
-                                  <div className="flex items-center gap-1.5">
-                                    {shortcut.keys.map((key, i) => (
-                                      <span key={i} className="flex items-center">
-                                        <kbd className="rounded-lg bg-grey-100 px-2.5 py-1.5 text-xs font-semibold text-grey-700 shadow-sm ring-1 ring-grey-200">
-                                          {key}
-                                        </kbd>
-                                        {i < shortcut.keys.length - 1 && (
-                                          <span className="mx-1 text-grey-400">+</span>
-                                        )}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="px-5 py-3 font-medium text-grey-900">{shortcut.action}</td>
-                                <td className="hidden sm:table-cell px-5 py-3 text-grey-600">{shortcut.description}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <KeyboardShortcutTable shortcuts={keyboardShortcuts} />
+
+                      <div className="mt-8 rounded-2xl border border-grey-200 bg-grey-50 p-6">
+                        <h4 className="font-semibold text-grey-900 mb-3 flex items-center gap-2">
+                          <Command className="h-5 w-5 text-sage-600" />
+                          Platform Notes
+                        </h4>
+                        <ul className="space-y-2 text-grey-600">
+                          <li className="flex items-start gap-2">
+                            <span className="text-sage-500">•</span>
+                            On Mac, use ⌘ (Command). On Windows/Linux, use Ctrl.
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-sage-500">•</span>
+                            Some shortcuts may be overridden by your browser or OS.
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="text-sage-500">•</span>
+                            Shortcuts work best when the chat input is not focused.
+                          </li>
+                        </ul>
                       </div>
                     </div>
                   )}
@@ -734,7 +1263,7 @@ export default function HelpPage() {
                   {/* Troubleshooting */}
                   {activeSection === "troubleshooting" && (
                     <div>
-                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-6">Troubleshooting</h3>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Troubleshooting</h3>
                       <p className="text-grey-600 mb-6">Having issues? Find solutions to common problems below.</p>
                       <div className="space-y-4">
                         {troubleshootingItems.map((item, index) => {
@@ -767,15 +1296,115 @@ export default function HelpPage() {
                   {/* Glossary */}
                   {activeSection === "glossary" && (
                     <div>
-                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-6">Glossary</h3>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Glossary</h3>
                       <p className="text-grey-600 mb-6">Learn the terminology used throughout Sage.</p>
-                      <div className="space-y-3">
-                        {glossaryTerms.map((item, index) => (
-                          <div key={index} className="rounded-xl border border-grey-200 bg-white p-4">
-                            <h4 className="font-semibold text-grey-900 mb-1">{item.term}</h4>
-                            <p className="text-sm text-grey-600">{item.definition}</p>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {glossaryTerms.map((item, index) => {
+                          const Icon = item.icon;
+                          return (
+                            <div key={index} className="rounded-xl border border-grey-200 bg-white p-4 flex gap-4">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sage-100 flex-shrink-0">
+                                <Icon className="h-5 w-5 text-sage-600" />
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-grey-900 mb-1">{item.term}</h4>
+                                <p className="text-sm text-grey-600">{item.definition}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* What's New */}
+                  {activeSection === "whats-new" && (
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">What's New</h3>
+                      <p className="text-grey-600 mb-6">Latest updates and improvements to Sage.</p>
+                      <div className="space-y-6">
+                        {whatsNewItems.map((release, index) => (
+                          <div key={index} className="rounded-2xl border border-grey-200 bg-white overflow-hidden">
+                            <div className="flex items-center justify-between border-b border-grey-100 bg-grey-50 px-6 py-4">
+                              <div>
+                                <h4 className="font-semibold text-grey-900">{release.title}</h4>
+                                <p className="text-sm text-grey-600">Version {release.version}</p>
+                              </div>
+                              <span className="rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
+                                {release.date}
+                              </span>
+                            </div>
+                            <div className="p-6">
+                              <ul className="space-y-2">
+                                {release.highlights.map((highlight, i) => (
+                                  <li key={i} className="flex items-center gap-3 text-grey-600">
+                                    <Sparkles className="h-4 w-4 text-sage-500" />
+                                    {highlight}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Privacy & Security */}
+                  {activeSection === "privacy" && (
+                    <div>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Privacy & Security</h3>
+                      <p className="text-grey-600 mb-6">How we protect your data and privacy.</p>
+
+                      <div className="grid gap-4 sm:grid-cols-2 mb-8">
+                        {privacyFeatures.map((feature, index) => {
+                          const Icon = feature.icon;
+                          return (
+                            <div key={index} className="rounded-xl border border-grey-200 bg-white p-5 flex gap-4">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sage-100 flex-shrink-0">
+                                <Icon className="h-6 w-6 text-sage-600" />
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-grey-900 mb-1">{feature.title}</h4>
+                                <p className="text-sm text-grey-600">{feature.description}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="rounded-2xl border border-grey-200 bg-white p-6">
+                        <h4 className="font-semibold text-grey-900 mb-4">Data Handling Practices</h4>
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-sage-500 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-grey-900">Encrypted Storage</p>
+                              <p className="text-sm text-grey-600">All conversations are encrypted at rest using industry-standard encryption.</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-sage-500 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-grey-900">Secure Transmission</p>
+                              <p className="text-sm text-grey-600">All data is transmitted over HTTPS with TLS 1.3 encryption.</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-sage-500 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-grey-900">Data Deletion</p>
+                              <p className="text-sm text-grey-600">You can delete any task at any time. Deleted data is permanently removed.</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-sage-500 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-grey-900">No Third-Party Sharing</p>
+                              <p className="text-sm text-grey-600">We never share your conversation data with third parties for marketing or other purposes.</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -824,12 +1453,32 @@ export default function HelpPage() {
                               "Advanced AI capabilities",
                               "Priority support",
                               "Early access to new features",
+                              "API access",
+                              "Team collaboration (coming soon)",
                             ].map((feature, i) => (
                               <li key={i} className="flex items-center gap-3 text-sage-700">
                                 <CheckCircle2 className="h-4 w-4 text-sage-600" />
                                 <span>{feature}</span>
                               </li>
                             ))}
+                          </ul>
+                        </div>
+
+                        <div className="rounded-2xl border border-grey-200 bg-grey-50 p-6">
+                          <h4 className="font-semibold text-grey-900 mb-4">Account Management</h4>
+                          <ul className="space-y-3">
+                            <li className="flex items-start gap-3 text-grey-600">
+                              <ChevronRight className="h-5 w-5 text-sage-500 flex-shrink-0" />
+                              <span>To change your email or password, go to Settings from the sidebar</span>
+                            </li>
+                            <li className="flex items-start gap-3 text-grey-600">
+                              <ChevronRight className="h-5 w-5 text-sage-500 flex-shrink-0" />
+                              <span>To delete your account, contact support@sage-ai.com</span>
+                            </li>
+                            <li className="flex items-start gap-3 text-grey-600">
+                              <ChevronRight className="h-5 w-5 text-sage-500 flex-shrink-0" />
+                              <span>Daily task limits reset at midnight in your local timezone</span>
+                            </li>
                           </ul>
                         </div>
                       </div>
@@ -839,7 +1488,7 @@ export default function HelpPage() {
                   {/* Contact */}
                   {activeSection === "contact" && (
                     <div>
-                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-6">Contact Support</h3>
+                      <h3 className="font-serif text-xl font-bold text-grey-900 mb-2">Contact Support</h3>
                       <p className="text-grey-600 mb-6">Need more help? We're here for you. Choose the best way to reach us.</p>
 
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -910,6 +1559,16 @@ export default function HelpPage() {
                           </div>
                         </a>
                       </div>
+
+                      <div className="mt-8 rounded-2xl border border-grey-200 bg-grey-50 p-6 text-center">
+                        <Clock className="h-8 w-8 text-sage-500 mx-auto mb-3" />
+                        <h4 className="font-semibold text-grey-900 mb-2">Response Times</h4>
+                        <p className="text-grey-600 text-sm">
+                          We typically respond to support requests within 24-48 hours.
+                          <br />
+                          Pro users receive priority support with faster response times.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -921,7 +1580,7 @@ export default function HelpPage() {
 
       {/* Footer */}
       <footer className="border-t border-grey-200 bg-white py-8">
-        <div className="mx-auto max-w-5xl px-4">
+        <div className="mx-auto max-w-6xl px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-grey-600">
               <Heart className="h-4 w-4 text-sage-500" />
