@@ -101,7 +101,52 @@ export function ChatInput() {
     }
 
     try {
-      // Create conversation if authenticated and none exists
+      // Step 1: Classify the message to determine if it's a task or greeting
+      const classifyResponse = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: userMessage }],
+          type: "classify",
+        }),
+      });
+
+      if (!classifyResponse.ok) {
+        if (classifyResponse.status === 401) {
+          throw new Error("Please sign in to use Sage.");
+        }
+        throw new Error("Failed to classify message");
+      }
+
+      const classifyData = await classifyResponse.json();
+      const isTask = classifyData.content.toLowerCase().trim() === "task";
+
+      // If it's just a greeting, respond conversationally without creating a task
+      if (!isTask) {
+        const greetingResponse = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: userMessage }],
+            type: "greeting",
+          }),
+        });
+
+        if (!greetingResponse.ok) {
+          throw new Error("Failed to get response");
+        }
+
+        const greetingData = await greetingResponse.json();
+        setTyping(false);
+        addMessage({
+          role: "assistant",
+          content: greetingData.content,
+          status: "sent",
+        });
+        return;
+      }
+
+      // It's a task - create conversation if authenticated and none exists
       let convId = currentConversationId;
       if (isAuthenticated && !convId) {
         const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
@@ -125,7 +170,7 @@ export function ChatInput() {
         await saveMessage(convId, "user", userMessage);
       }
 
-      // Step 1: Get acknowledgement
+      // Step 2: Get acknowledgement
       const ackResponse = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -156,7 +201,7 @@ export function ChatInput() {
         await saveMessage(convId, "assistant", ackData.content);
       }
 
-      // Step 2: Generate plan
+      // Step 3: Generate plan
       setGenerating(true);
       setActiveTab("plan");
 

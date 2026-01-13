@@ -21,7 +21,6 @@ import {
   Trash2,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { useUIStore } from "@/stores/uiStore";
@@ -338,14 +337,14 @@ export function Sidebar() {
               return (
                 <div
                   key={conv.id}
+                  className="relative"
                   onMouseEnter={() => setHoveredTask(conv.id)}
                   onMouseLeave={() => setHoveredTask(null)}
-                  className="relative"
                 >
-                  <Link
-                    href={`/task/${conv.id}`}
+                  <button
+                    onClick={() => handleConversationClick(conv.id)}
                     className={cn(
-                      "group relative z-10 flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50 no-underline",
+                      "group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50",
                       isActive && "bg-sage-50"
                     )}
                   >
@@ -364,7 +363,8 @@ export function Sidebar() {
                     {/* Time or hover actions */}
                     {isHovered ? (
                       <div className="flex items-center gap-0.5 animate-fade-in">
-                        <button
+                        <span
+                          role="button"
                           onClick={(e) => handleToggleStar(conv.id, e)}
                           className={cn(
                             "flex h-6 w-6 items-center justify-center rounded-md transition-all",
@@ -374,18 +374,19 @@ export function Sidebar() {
                           )}
                         >
                           <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
-                        </button>
-                        <button
+                        </span>
+                        <span
+                          role="button"
                           onClick={(e) => handleDelete(conv.id, e)}
                           className="flex h-6 w-6 items-center justify-center rounded-md text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600"
                         >
                           <Trash2 className="h-3 w-3" />
-                        </button>
+                        </span>
                       </div>
                     ) : (
                       <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
                     )}
-                  </Link>
+                  </button>
                 </div>
               );
             })}
