@@ -3,13 +3,14 @@
 import { useCallback, useState, useEffect } from "react";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
-import { ResizeHandle, SearchModal } from "@/components/ui";
+import { ResizeHandle, SearchModal, CommandPalette } from "@/components/ui";
 import { ChatPanel } from "@/components/chat";
 import { WorkspacePanel } from "@/components/workspace";
 import { AuthModal } from "@/components/auth";
 import { Sidebar } from "./Sidebar";
 import { useKeyboardShortcuts } from "@/hooks";
 import { useSearchStore } from "@/stores/searchStore";
+import { useCommandPaletteStore } from "@/stores/commandPaletteStore";
 
 export function MainLayout() {
   // Enable global keyboard shortcuts
@@ -17,6 +18,7 @@ export function MainLayout() {
   const { leftPanelWidth, setLeftPanelWidth } = useUIStore();
   const { isAuthenticated, isLoading } = useAuthStore();
   const { isOpen: isSearchOpen, closeSearch } = useSearchStore();
+  const { isOpen: isPaletteOpen, closePalette } = useCommandPaletteStore();
   const [mounted, setMounted] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -80,6 +82,9 @@ export function MainLayout() {
 
       {/* Search Modal */}
       <SearchModal isOpen={isSearchOpen} onClose={closeSearch} />
+
+      {/* Command Palette */}
+      <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
     </>
   );
 }

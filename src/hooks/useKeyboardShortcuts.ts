@@ -7,6 +7,7 @@ import { useConversationStore } from "@/stores/conversationStore";
 import { useChatStore } from "@/stores/chatStore";
 import { usePlanStore } from "@/stores/planStore";
 import { useSearchStore } from "@/stores/searchStore";
+import { useCommandPaletteStore } from "@/stores/commandPaletteStore";
 
 export function useKeyboardShortcuts() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export function useKeyboardShortcuts() {
   const { clearMessages } = useChatStore();
   const { clearPlan } = usePlanStore();
   const { toggleSearch } = useSearchStore();
+  const { togglePalette } = useCommandPaletteStore();
 
   const handleNewTask = useCallback(() => {
     setCurrentConversation(null);
@@ -58,6 +60,13 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Cmd/Ctrl + P: Toggle Command Palette
+      if (isMeta && e.key === "p") {
+        e.preventDefault();
+        togglePalette();
+        return;
+      }
+
       // Cmd/Ctrl + ,: Settings
       if (isMeta && e.key === ",") {
         e.preventDefault();
@@ -75,5 +84,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNewTask, toggleSidebar, toggleSearch, router]);
+  }, [handleNewTask, toggleSidebar, toggleSearch, togglePalette, router]);
 }
