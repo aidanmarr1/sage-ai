@@ -5,6 +5,7 @@ export interface SearchResult {
   title: string;
   url: string;
   content: string;
+  favicon?: string;
 }
 
 export interface AgentAction {

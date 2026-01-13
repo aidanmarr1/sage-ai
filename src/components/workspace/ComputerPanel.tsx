@@ -105,32 +105,44 @@ export function ComputerPanel() {
             <p className="text-sm text-grey-500">No results found</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {latestSearchResults.map((result, index) => (
               <div
                 key={index}
-                className="group rounded-xl border border-grey-200 bg-white p-4 transition-all hover:border-sage-200 hover:shadow-sm"
+                className="group rounded-lg border border-grey-200 bg-white p-3 transition-all hover:border-sage-200 hover:shadow-sm"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-grey-100 group-hover:bg-sage-100 transition-colors">
-                    <Globe className="h-4 w-4 text-grey-500 group-hover:text-sage-600" />
+                  {/* Favicon */}
+                  <div className="flex-shrink-0 flex h-6 w-6 items-center justify-center rounded overflow-hidden bg-grey-100">
+                    {result.favicon ? (
+                      <img
+                        src={result.favicon}
+                        alt=""
+                        className="h-5 w-5"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <Globe className={`h-4 w-4 text-grey-400 ${result.favicon ? 'hidden' : ''}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-medium text-grey-900 text-sm line-clamp-1">
                       {result.title}
                     </h3>
+                    <p className="text-xs text-grey-600 line-clamp-2 mt-1">
+                      {result.content}
+                    </p>
                     <a
                       href={result.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-sage-600 hover:text-sage-700 mt-0.5"
+                      className="inline-flex items-center gap-1 text-xs text-sage-600 hover:text-sage-700 mt-1"
                     >
-                      <span className="truncate max-w-[200px]">{result.url}</span>
-                      <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                      Read more
+                      <ExternalLink className="h-3 w-3" />
                     </a>
-                    <p className="mt-2 text-xs text-grey-600 line-clamp-3">
-                      {result.content}
-                    </p>
                   </div>
                 </div>
               </div>

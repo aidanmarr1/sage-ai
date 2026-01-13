@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const SERPER_API_KEY = process.env.SERPER_API_KEY;
 
 // Tool definitions for the agent
 const TOOLS = [
@@ -80,6 +81,7 @@ interface SearchResult {
   title: string;
   url: string;
   content: string;
+  favicon?: string;
 }
 
 interface ExecuteResponse {
@@ -105,49 +107,47 @@ interface ChatMessage {
   tool_call_id?: string;
 }
 
-async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
-  // Wikipedia API - completely free, no key needed, returns actual results
-  const wikiSearchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=5&origin=*`;
+async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string; favicon?: string }> }> {
+  // Serper.dev - Real Google search results
+  if (!SERPER_API_KEY) {
+    console.error("SERPER_API_KEY not configured");
+    return { results: [] };
+  }
 
   try {
-    const searchResponse = await fetch(wikiSearchUrl, {
-      headers: { "Accept": "application/json" },
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ q: query, num: 8 }),
     });
 
-    if (!searchResponse.ok) {
+    if (!response.ok) {
+      console.error("Serper API error:", response.status);
       return { results: [] };
     }
 
-    const searchData = await searchResponse.json();
-    const searchResults = searchData.query?.search || [];
+    const data = await response.json();
+    const organic = data.organic || [];
 
-    if (searchResults.length === 0) {
-      return { results: [] };
-    }
+    const results = organic.map((r: { title: string; link: string; snippet: string }) => {
+      let favicon: string | undefined;
+      try {
+        const hostname = new URL(r.link).hostname;
+        favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+      } catch {
+        favicon = undefined;
+      }
 
-    // Get page extracts for the found articles
-    const pageIds = searchResults.map((r: { pageid: number }) => r.pageid).join("|");
-    const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&pageids=${pageIds}&prop=extracts&exintro=1&explaintext=1&format=json&origin=*`;
-
-    const extractResponse = await fetch(extractUrl, {
-      headers: { "Accept": "application/json" },
+      return {
+        title: r.title,
+        url: r.link,
+        content: r.snippet || "",
+        favicon,
+      };
     });
-
-    const extractData = await extractResponse.json();
-    const pages = extractData.query?.pages || {};
-
-    const results: Array<{ title: string; url: string; content: string }> = [];
-
-    for (const result of searchResults) {
-      const page = pages[result.pageid];
-      const extract = page?.extract || result.snippet?.replace(/<[^>]*>/g, "") || "";
-
-      results.push({
-        title: result.title,
-        url: `https://en.wikipedia.org/wiki/${encodeURIComponent(result.title.replace(/ /g, "_"))}`,
-        content: extract.substring(0, 500) + (extract.length > 500 ? "..." : ""),
-      });
-    }
 
     return { results };
   } catch (error) {
