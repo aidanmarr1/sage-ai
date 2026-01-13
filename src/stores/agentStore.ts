@@ -8,6 +8,14 @@ export interface AgentAction {
   status: "running" | "completed" | "error";
   detail?: string;
   timestamp: Date;
+  stepIndex: number;
+}
+
+export interface StepExecution {
+  stepIndex: number;
+  stepContent: string;
+  status: "pending" | "running" | "completed" | "error";
+  actions: AgentAction[];
 }
 
 interface AgentState {
@@ -15,11 +23,13 @@ interface AgentState {
   currentStepIndex: number;
   actions: AgentAction[];
   findings: string;
+  stepContents: string[]; // Store step contents for display
 
   // Actions
   setExecuting: (executing: boolean) => void;
   setCurrentStepIndex: (index: number) => void;
-  addAction: (action: Omit<AgentAction, "id" | "timestamp">) => string;
+  setStepContents: (contents: string[]) => void;
+  addAction: (action: Omit<AgentAction, "id" | "timestamp" | "stepIndex">) => string;
   updateAction: (id: string, updates: Partial<AgentAction>) => void;
   completeAction: (id: string) => void;
   errorAction: (id: string, detail?: string) => void;
@@ -34,17 +44,22 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   currentStepIndex: 0,
   actions: [],
   findings: "",
+  stepContents: [],
 
   setExecuting: (executing) => set({ isExecuting: executing }),
 
   setCurrentStepIndex: (index) => set({ currentStepIndex: index }),
 
+  setStepContents: (contents) => set({ stepContents: contents }),
+
   addAction: (action) => {
     const id = nanoid();
+    const { currentStepIndex } = get();
     const newAction: AgentAction = {
       ...action,
       id,
       timestamp: new Date(),
+      stepIndex: currentStepIndex,
     };
     set((state) => ({
       actions: [...state.actions, newAction],
@@ -94,5 +109,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentStepIndex: 0,
       actions: [],
       findings: "",
+      stepContents: [],
     }),
 }));

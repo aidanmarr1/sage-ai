@@ -16,7 +16,7 @@ import {
 
 export function PlanPanel() {
   const { currentPlan, isGenerating, updateStepStatus } = usePlanStore();
-  const { isExecuting, setExecuting, setCurrentStepIndex, addAction, completeAction, appendFindings, clearActions, reset } = useAgentStore();
+  const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
 
   const handleExecute = async () => {
@@ -25,6 +25,9 @@ export function PlanPanel() {
     // Reset and start execution
     reset();
     setExecuting(true);
+
+    // Store step contents for display
+    setStepContents(currentPlan.steps.map((s) => s.content));
 
     try {
       for (let i = 0; i < currentPlan.steps.length; i++) {
