@@ -102,16 +102,8 @@ export function ComputerPanel() {
 
         {/* Browser Content */}
         <div className="flex-1 overflow-hidden bg-grey-100">
-          {browserState.liveViewUrl && browserState.isActive ? (
-            // Live browser iframe
-            <iframe
-              src={browserState.liveViewUrl}
-              className="h-full w-full border-0"
-              sandbox="allow-same-origin allow-scripts"
-              title="Live browser view"
-            />
-          ) : browserState.screenshot ? (
-            // Screenshot fallback
+          {browserState.screenshot ? (
+            // Screenshot view
             <div className="h-full w-full overflow-auto p-2">
               <img
                 src={`data:image/png;base64,${browserState.screenshot}`}
@@ -125,7 +117,13 @@ export function ComputerPanel() {
               <Loader2 className="h-8 w-8 animate-spin text-sage-500 mb-4" />
               <p className="text-sm text-grey-500">Loading page...</p>
             </div>
-          ) : null}
+          ) : (
+            // Waiting state
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Globe className="h-8 w-8 text-grey-300 mb-4" />
+              <p className="text-sm text-grey-500">Waiting for page...</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -148,7 +146,7 @@ export function ComputerPanel() {
             )}
           </div>
           <span className="text-xs text-grey-500">
-            Live view
+            {browserState.screenshot ? "Screenshot" : "Browser"}
           </span>
         </div>
       </div>
