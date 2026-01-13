@@ -316,13 +316,14 @@ export function PlanPanel() {
             <div
               key={step.id}
               className={cn(
-                "group flex gap-4 rounded-xl border p-4 transition-all",
+                "group flex gap-4 rounded-xl border p-4 transition-all animate-fade-in-up",
                 step.status === "completed"
                   ? "border-sage-200 bg-sage-50/50"
                   : step.status === "in_progress"
-                  ? "border-sage-300 bg-sage-50 shadow-sm"
+                  ? "border-sage-300 bg-sage-50 shadow-sm ring-1 ring-sage-200"
                   : "border-grey-200 bg-white hover:border-grey-300 hover:shadow-sm"
               )}
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               {/* Step number / status */}
               <div className="flex-shrink-0">
@@ -359,14 +360,27 @@ export function PlanPanel() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-grey-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-2">
-          <Circle className="h-2.5 w-2.5 fill-sage-500 text-sage-500" />
-          <span className="text-xs text-grey-500">
-            {currentPlan.steps.filter((s) => s.status === "completed").length} of{" "}
-            {currentPlan.steps.length} completed
+      {/* Footer with progress bar */}
+      <div className="border-t border-grey-200 bg-white px-6 py-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Circle className="h-2.5 w-2.5 fill-sage-500 text-sage-500" />
+            <span className="text-xs text-grey-500">
+              {currentPlan.steps.filter((s) => s.status === "completed").length} of{" "}
+              {currentPlan.steps.length} completed
+            </span>
+          </div>
+          <span className="text-xs font-medium text-sage-600">
+            {Math.round((currentPlan.steps.filter((s) => s.status === "completed").length / currentPlan.steps.length) * 100)}%
           </span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-grey-100">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-sage-400 to-sage-500 transition-all duration-500"
+            style={{
+              width: `${(currentPlan.steps.filter((s) => s.status === "completed").length / currentPlan.steps.length) * 100}%`,
+            }}
+          />
         </div>
       </div>
     </div>

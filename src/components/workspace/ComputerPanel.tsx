@@ -206,9 +206,29 @@ export function ComputerPanel() {
       {/* Search Results */}
       <div className="flex-1 overflow-y-auto p-4">
         {latestSearchResults.length === 0 && isSearching ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-sage-500 mb-4" />
-            <p className="text-sm text-grey-500">Searching the web...</p>
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="animate-fade-in-up rounded-lg border border-grey-200 bg-white p-3"
+                style={{ animationDelay: `${i * 100}ms` }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="h-6 w-6 rounded animate-shimmer" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 rounded animate-shimmer" />
+                    <div className="h-3 w-full rounded animate-shimmer" />
+                    <div className="h-3 w-1/4 rounded animate-shimmer" />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="flex items-center justify-center pt-4">
+              <div className="flex items-center gap-2 text-sage-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Searching the web...</span>
+              </div>
+            </div>
           </div>
         ) : latestSearchResults.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -220,7 +240,8 @@ export function ComputerPanel() {
             {latestSearchResults.map((result, index) => (
               <div
                 key={index}
-                className="group rounded-lg border border-grey-200 bg-white p-3 transition-all hover:border-sage-200 hover:shadow-sm"
+                className="group animate-fade-in-up rounded-lg border border-grey-200 bg-white p-3 transition-all hover:border-sage-200 hover:shadow-sm"
+                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div className="flex items-start gap-3">
                   {/* Favicon */}
