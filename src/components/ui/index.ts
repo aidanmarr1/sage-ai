@@ -8,3 +8,7 @@ export { CommandPalette } from "./CommandPalette";
 export { MobileWorkspaceSheet, MobileWorkspaceTrigger } from "./MobileWorkspaceSheet";
 export { ErrorBoundary, InlineError } from "./ErrorBoundary";
 export { EmptyState } from "./EmptyState";
+export { LoadingSpinner, PageLoader, InlineLoader, DotsLoader } from "./LoadingSpinner";
+export { Tooltip } from "./Tooltip";
+export { Badge, NotificationBadge, PulsingDot, StatusBadge } from "./Badge";
+export { Avatar, AvatarGroup } from "./Avatar";
