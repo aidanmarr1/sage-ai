@@ -119,7 +119,9 @@ export function ChatInput() {
       }
 
       const classifyData = await classifyResponse.json();
-      const isTask = classifyData.content.toLowerCase().trim() === "task";
+      const classifyResult = classifyData.content.toLowerCase().trim();
+      // More lenient check - LLM might return extra text
+      const isTask = classifyResult.includes("task") && !classifyResult.includes("greeting");
 
       // If it's just a greeting, respond conversationally without creating a task
       if (!isTask) {

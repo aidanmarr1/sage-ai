@@ -337,56 +337,62 @@ export function Sidebar() {
               return (
                 <div
                   key={conv.id}
-                  className="relative"
+                  className="group relative"
                   onMouseEnter={() => setHoveredTask(conv.id)}
                   onMouseLeave={() => setHoveredTask(null)}
                 >
+                  {/* Main clickable area */}
                   <button
                     onClick={() => handleConversationClick(conv.id)}
                     className={cn(
-                      "group flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50",
+                      "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50",
                       isActive && "bg-sage-50"
                     )}
                   >
                     {conv.starred ? (
                       <Star className="h-3.5 w-3.5 flex-shrink-0 fill-sage-500 text-sage-500" />
                     ) : (
-                      <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-grey-300 transition-colors group-hover:text-grey-500" />
+                      <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-grey-300" />
                     )}
                     <span className={cn(
-                      "flex-1 truncate text-sm transition-colors group-hover:text-grey-900",
+                      "flex-1 truncate text-sm",
                       conv.starred || isActive ? "text-grey-800" : "text-grey-600"
                     )}>
                       {conv.title}
                     </span>
-
-                    {/* Time or hover actions */}
-                    {isHovered ? (
-                      <div className="flex items-center gap-0.5 animate-fade-in">
-                        <span
-                          role="button"
-                          onClick={(e) => handleToggleStar(conv.id, e)}
-                          className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-md transition-all",
-                            conv.starred
-                              ? "text-sage-500 hover:bg-sage-100"
-                              : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
-                          )}
-                        >
-                          <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
-                        </span>
-                        <span
-                          role="button"
-                          onClick={(e) => handleDelete(conv.id, e)}
-                          className="flex h-6 w-6 items-center justify-center rounded-md text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </span>
-                      </div>
-                    ) : (
+                    {!isHovered && (
                       <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
                     )}
                   </button>
+
+                  {/* Action buttons - outside the main button */}
+                  {isHovered && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 animate-fade-in">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleStar(conv.id, e);
+                        }}
+                        className={cn(
+                          "flex h-6 w-6 items-center justify-center rounded-md transition-all",
+                          conv.starred
+                            ? "text-sage-500 hover:bg-sage-100"
+                            : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
+                        )}
+                      >
+                        <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(conv.id, e);
+                        }}
+                        className="flex h-6 w-6 items-center justify-center rounded-md text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
