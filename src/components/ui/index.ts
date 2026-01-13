@@ -5,3 +5,4 @@ export { ToastProvider, useToast } from "./Toast";
 export { Confetti } from "./Confetti";
 export { Skeleton, SkeletonMessage, SkeletonCard, SkeletonSearchResult } from "./Skeleton";
 export { CommandPalette } from "./CommandPalette";
+export { MobileWorkspaceSheet, MobileWorkspaceTrigger } from "./MobileWorkspaceSheet";

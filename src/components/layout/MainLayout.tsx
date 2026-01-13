@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
-import { ResizeHandle, SearchModal, CommandPalette } from "@/components/ui";
+import { ResizeHandle, SearchModal, CommandPalette, MobileWorkspaceSheet, MobileWorkspaceTrigger } from "@/components/ui";
 import { ChatPanel } from "@/components/chat";
 import { WorkspacePanel } from "@/components/workspace";
 import { AuthModal } from "@/components/auth";
@@ -23,6 +23,7 @@ export function MainLayout() {
   const [mounted, setMounted] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileWorkspaceOpen, setMobileWorkspaceOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -110,6 +111,17 @@ export function MainLayout() {
 
       {/* Command Palette */}
       <CommandPalette isOpen={isPaletteOpen} onClose={closePalette} />
+
+      {/* Mobile Workspace Trigger */}
+      <MobileWorkspaceTrigger onClick={() => setMobileWorkspaceOpen(true)} />
+
+      {/* Mobile Workspace Sheet */}
+      <MobileWorkspaceSheet
+        isOpen={mobileWorkspaceOpen}
+        onClose={() => setMobileWorkspaceOpen(false)}
+      >
+        <WorkspacePanel />
+      </MobileWorkspaceSheet>
     </>
   );
 }
