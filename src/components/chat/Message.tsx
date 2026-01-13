@@ -4,7 +4,7 @@ import { memo, useState } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/cn";
 import type { Message as MessageType } from "@/types";
-import { User, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
+import { User, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, AlertCircle, RefreshCw } from "lucide-react";
 import Image from "next/image";
 
 interface MessageProps {
@@ -111,9 +111,11 @@ export const Message = memo(function Message({ message, isFirst = true, isLast =
           <div
             className={cn(
               "relative rounded-2xl px-4 py-3 transition-all duration-200",
-              isUser
-                ? "bg-gradient-to-br from-sage-500 to-sage-600 text-white shadow-md shadow-sage-500/20"
-                : "bg-white text-grey-800 shadow-md shadow-grey-200/50 ring-1 ring-grey-100",
+              message.status === "error"
+                ? "bg-grey-100 text-grey-600 ring-1 ring-grey-200"
+                : isUser
+                  ? "bg-gradient-to-br from-sage-500 to-sage-600 text-white shadow-md shadow-sage-500/20"
+                  : "bg-white text-grey-800 shadow-md shadow-grey-200/50 ring-1 ring-grey-100",
               isFirst && isUser && "rounded-tr-lg",
               isFirst && !isUser && "rounded-tl-lg",
               isLast && isUser && "rounded-br-lg",
@@ -121,9 +123,27 @@ export const Message = memo(function Message({ message, isFirst = true, isLast =
               "group-hover:shadow-lg"
             )}
           >
+            {message.status === "error" && (
+              <div className="flex items-center gap-2 mb-2 text-grey-500">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-xs font-medium">Failed to send</span>
+              </div>
+            )}
             <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
               {message.content}
             </p>
+            {message.status === "error" && (
+              <button className="mt-2 flex items-center gap-1.5 text-xs font-medium text-sage-600 hover:text-sage-700 transition-colors">
+                <RefreshCw className="h-3 w-3" />
+                Retry
+              </button>
+            )}
+            {message.status === "sending" && (
+              <div className="mt-1.5 flex items-center gap-1 text-xs text-white/70">
+                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-white/70" />
+                Sending...
+              </div>
+            )}
           </div>
         )}
 

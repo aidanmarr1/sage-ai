@@ -6,3 +6,5 @@ export { Confetti } from "./Confetti";
 export { Skeleton, SkeletonMessage, SkeletonCard, SkeletonSearchResult } from "./Skeleton";
 export { CommandPalette } from "./CommandPalette";
 export { MobileWorkspaceSheet, MobileWorkspaceTrigger } from "./MobileWorkspaceSheet";
+export { ErrorBoundary, InlineError } from "./ErrorBoundary";
+export { EmptyState } from "./EmptyState";
