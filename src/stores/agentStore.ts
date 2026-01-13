@@ -10,7 +10,7 @@ export interface SearchResult {
 
 export interface AgentAction {
   id: string;
-  type: "thinking" | "searching" | "search_complete" | "writing" | "complete" | "error";
+  type: "thinking" | "searching" | "search_complete" | "writing" | "synthesizing" | "complete" | "error";
   label: string;
   status: "running" | "completed" | "error";
   detail?: string;
@@ -31,6 +31,7 @@ interface AgentState {
   currentStepIndex: number;
   actions: AgentAction[];
   findings: string;
+  finalReport: string;
   stepContents: string[];
   latestSearchResults: SearchResult[];
 
@@ -45,6 +46,8 @@ interface AgentState {
   errorAction: (id: string, detail?: string) => void;
   appendFindings: (content: string) => void;
   setFindings: (content: string) => void;
+  setFinalReport: (report: string) => void;
+  appendFinalReport: (content: string) => void;
   setLatestSearchResults: (results: SearchResult[]) => void;
   clearActions: () => void;
   reset: () => void;
@@ -55,6 +58,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   currentStepIndex: 0,
   actions: [],
   findings: "",
+  finalReport: "",
   stepContents: [],
   latestSearchResults: [],
 
@@ -144,6 +148,14 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   setFindings: (content) => set({ findings: content }),
 
+  setFinalReport: (report) => set({ finalReport: report }),
+
+  appendFinalReport: (content) => {
+    set((state) => ({
+      finalReport: state.finalReport + content,
+    }));
+  },
+
   setLatestSearchResults: (results) => set({ latestSearchResults: results }),
 
   clearActions: () => set({ actions: [] }),
@@ -154,6 +166,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       currentStepIndex: 0,
       actions: [],
       findings: "",
+      finalReport: "",
       stepContents: [],
       latestSearchResults: [],
     }),

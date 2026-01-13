@@ -98,6 +98,7 @@ export function PlanPanel() {
     setStepContents(currentPlan.steps.map((s) => s.content));
 
     try {
+      let allStepsSucceeded = true;
       for (let i = 0; i < currentPlan.steps.length; i++) {
         const step = currentPlan.steps[i];
         setCurrentStepIndex(i);
@@ -114,7 +115,75 @@ export function PlanPanel() {
             status: "error",
           });
           updateStepStatus(step.id, "pending");
+          allStepsSucceeded = false;
           break;
+        }
+      }
+
+      // If all steps succeeded, synthesize findings into final report
+      if (allStepsSucceeded) {
+        const findings = useAgentStore.getState().findings;
+
+        if (findings) {
+          // Move to synthesis step
+          setCurrentStepIndex(currentPlan.steps.length);
+          setStepContents([...currentPlan.steps.map((s) => s.content), "Synthesizing final report"]);
+
+          addAction({
+            type: "synthesizing",
+            label: "Creating polished report...",
+            status: "running",
+          });
+
+          try {
+            const response = await fetch("/api/agent/synthesize", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                findings,
+                taskContext: currentPlan.title,
+              }),
+            });
+
+            if (response.ok && response.body) {
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const text = decoder.decode(value);
+                const lines = text.split("\n");
+
+                for (const line of lines) {
+                  if (line.startsWith("data: ")) {
+                    try {
+                      const event = JSON.parse(line.slice(6));
+                      if (event.type === "content") {
+                        useAgentStore.getState().appendFinalReport(event.data);
+                      } else if (event.type === "done") {
+                        addAction({
+                          type: "synthesizing",
+                          label: "Report ready",
+                          status: "completed",
+                        });
+                      }
+                    } catch {
+                      // Ignore parse errors
+                    }
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Synthesis error:", error);
+            addAction({
+              type: "error",
+              label: "Failed to synthesize report",
+              status: "error",
+            });
+          }
         }
       }
 

@@ -6,6 +6,7 @@ import { useAgentStore } from "@/stores/agentStore";
 import { Message } from "./Message";
 import { TypingIndicator } from "./TypingIndicator";
 import { AgentActions } from "./AgentActions";
+import { ReportCard } from "./ReportCard";
 import { Search, ArrowDown, PenLine, Lightbulb, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
@@ -19,14 +20,14 @@ const suggestions = [
 
 export function MessageList() {
   const { messages, isTyping, addMessage, setTyping } = useChatStore();
-  const { actions, isExecuting } = useAgentStore();
+  const { actions, isExecuting, finalReport } = useAgentStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping, actions]);
+  }, [messages, isTyping, actions, finalReport]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -141,6 +142,11 @@ export function MessageList() {
         {(actions.length > 0 || isExecuting) && (
           <div className="mx-4 my-2">
             <AgentActions />
+          </div>
+        )}
+        {finalReport && !isExecuting && (
+          <div className="mx-4 my-4">
+            <ReportCard />
           </div>
         )}
         {isTyping && <TypingIndicator />}

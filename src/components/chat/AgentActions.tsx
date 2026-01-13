@@ -9,7 +9,7 @@ import {
   FileText,
   AlertCircle,
   Loader2,
-  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -29,6 +29,8 @@ function ActionIcon({ type, status }: { type: AgentAction["type"]; status: Agent
       return <CheckCircle2 className={cn(baseClass, "text-sage-500")} />;
     case "writing":
       return <FileText className={cn(baseClass, "text-sage-500")} />;
+    case "synthesizing":
+      return <Sparkles className={cn(baseClass, "text-sage-600")} />;
     case "complete":
       return <CheckCircle2 className={cn(baseClass, "text-sage-600")} />;
     case "error":
