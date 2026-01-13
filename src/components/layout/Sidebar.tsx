@@ -354,8 +354,8 @@ export function Sidebar() {
                   <button
                     onClick={() => handleConversationClick(conv.id)}
                     className={cn(
-                      "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50",
-                      isActive && "bg-sage-50"
+                      "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50 hover:translate-x-0.5",
+                      isActive && "bg-sage-50 border-l-2 border-sage-400"
                     )}
                   >
                     {conv.starred ? (
