@@ -12,15 +12,39 @@ import {
   Loader2,
   Sparkles,
   Play,
-  Pause,
+  RotateCcw,
+  Clock,
+  XCircle,
 } from "lucide-react";
 import { Confetti } from "@/components/ui";
 
 export function PlanPanel() {
-  const { currentPlan, isGenerating, updateStepStatus } = usePlanStore();
+  const { currentPlan, isGenerating, updateStepStatus, clearPlan } = usePlanStore();
   const [showConfetti, setShowConfetti] = useState(false);
+  const [executionStartTime, setExecutionStartTime] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, setBrowserState, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
+
+  // Update elapsed time every second while executing
+  useEffect(() => {
+    if (!isExecuting || !executionStartTime) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - executionStartTime.getTime()) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isExecuting, executionStartTime]);
+
+  // Format elapsed time as mm:ss
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Memoized calculations
   const completedCount = useMemo(
@@ -101,12 +125,25 @@ export function PlanPanel() {
     });
   };
 
+  const handleRestart = () => {
+    if (!currentPlan) return;
+    // Reset all step statuses to pending
+    currentPlan.steps.forEach(step => {
+      updateStepStatus(step.id, "pending");
+    });
+    reset();
+    setElapsedTime(0);
+    setExecutionStartTime(null);
+  };
+
   const handleExecute = async () => {
     if (!currentPlan || isExecuting) return;
 
     // Reset and start execution
     reset();
     setExecuting(true);
+    setExecutionStartTime(new Date());
+    setElapsedTime(0);
 
     // Switch to computer tab to show live search results
     setActiveTab("computer");
@@ -300,25 +337,68 @@ export function PlanPanel() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {currentPlan.status === "ready" && !isExecuting && (
+          {/* Elapsed time during execution */}
+          {isExecuting && (
+            <div className="flex items-center gap-1.5 text-xs text-grey-500">
+              <Clock className="h-3.5 w-3.5" />
+              <span className="font-mono">{formatTime(elapsedTime)}</span>
+            </div>
+          )}
+
+          {/* Execute button */}
+          {currentPlan.status === "ready" && !isExecuting && completedCount === 0 && (
             <button
               onClick={handleExecute}
-              className="flex items-center gap-2 rounded-full bg-sage-500 px-4 py-1.5 text-xs font-medium text-white shadow-md shadow-sage-500/20 transition-all hover:bg-sage-600 hover:shadow-lg"
+              className="flex items-center gap-2 rounded-full bg-sage-500 px-4 py-1.5 text-xs font-medium text-white shadow-md shadow-sage-500/20 transition-all hover:bg-sage-600 hover:shadow-lg active:scale-95"
             >
               <Play className="h-3.5 w-3.5" />
               Execute
             </button>
           )}
+
+          {/* Executing indicator */}
           {isExecuting && (
             <div className="flex items-center gap-2 rounded-full bg-sage-100 px-4 py-1.5 text-xs font-medium text-sage-700">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Executing...
             </div>
           )}
-          {currentPlan.status === "completed" && !isExecuting && (
-            <span className="rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
-              Completed
-            </span>
+
+          {/* Completed state with restart option */}
+          {completedCount === totalSteps && totalSteps > 0 && !isExecuting && (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
+                Completed
+              </span>
+              <button
+                onClick={handleRestart}
+                className="flex items-center gap-1.5 rounded-full border border-grey-200 bg-white px-3 py-1 text-xs font-medium text-grey-600 transition-all hover:bg-grey-50 hover:border-grey-300"
+                title="Reset and run again"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Restart
+              </button>
+            </div>
+          )}
+
+          {/* Partial completion state */}
+          {completedCount > 0 && completedCount < totalSteps && !isExecuting && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExecute}
+                className="flex items-center gap-2 rounded-full bg-sage-500 px-4 py-1.5 text-xs font-medium text-white shadow-md shadow-sage-500/20 transition-all hover:bg-sage-600 hover:shadow-lg active:scale-95"
+              >
+                <Play className="h-3.5 w-3.5" />
+                Continue
+              </button>
+              <button
+                onClick={handleRestart}
+                className="flex items-center gap-1.5 rounded-full border border-grey-200 bg-white px-3 py-1 text-xs font-medium text-grey-600 transition-all hover:bg-grey-50 hover:border-grey-300"
+                title="Reset all steps"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </button>
+            </div>
           )}
         </div>
       </div>
