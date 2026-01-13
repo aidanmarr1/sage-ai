@@ -19,10 +19,12 @@ export interface BrowserState {
 
 export interface AgentAction {
   id: string;
-  type: "thinking" | "searching" | "search_complete" | "browsing" | "writing" | "synthesizing" | "complete" | "error";
+  type: "thinking" | "reasoning" | "searching" | "deep_searching" | "search_complete" | "browsing" | "analyzing" | "validating" | "writing" | "evaluating" | "synthesizing" | "complete" | "error";
   label: string;
   status: "running" | "completed" | "error";
   detail?: string;
+  reasoning?: string;
+  confidence?: "high" | "medium" | "low";
   timestamp: Date;
   stepIndex: number;
   searchResults?: SearchResult[];
@@ -44,6 +46,9 @@ interface AgentState {
   stepContents: string[];
   latestSearchResults: SearchResult[];
   browserState: BrowserState;
+  currentReasoning: string;
+  qualityScore: "excellent" | "good" | "needs_improvement" | null;
+  totalIterations: number;
 
   // Actions
   setExecuting: (executing: boolean) => void;
@@ -61,6 +66,9 @@ interface AgentState {
   setLatestSearchResults: (results: SearchResult[]) => void;
   setBrowserState: (state: Partial<BrowserState>) => void;
   resetBrowserState: () => void;
+  setCurrentReasoning: (reasoning: string) => void;
+  setQualityScore: (score: "excellent" | "good" | "needs_improvement" | null) => void;
+  incrementIterations: () => void;
   clearActions: () => void;
   reset: () => void;
 }
@@ -83,6 +91,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   stepContents: [],
   latestSearchResults: [],
   browserState: initialBrowserState,
+  currentReasoning: "",
+  qualityScore: null,
+  totalIterations: 0,
 
   setExecuting: (executing) => set({ isExecuting: executing }),
 
@@ -188,6 +199,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   resetBrowserState: () => set({ browserState: initialBrowserState }),
 
+  setCurrentReasoning: (reasoning) => set({ currentReasoning: reasoning }),
+
+  setQualityScore: (score) => set({ qualityScore: score }),
+
+  incrementIterations: () => set((state) => ({ totalIterations: state.totalIterations + 1 })),
+
   clearActions: () => set({ actions: [] }),
 
   reset: () =>
@@ -200,5 +217,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       stepContents: [],
       latestSearchResults: [],
       browserState: initialBrowserState,
+      currentReasoning: "",
+      qualityScore: null,
+      totalIterations: 0,
     }),
 }));

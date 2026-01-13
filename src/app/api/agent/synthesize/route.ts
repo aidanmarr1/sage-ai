@@ -4,26 +4,68 @@ import { getSession } from "@/lib/auth";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
-const SYNTHESIS_PROMPT = `You are creating a final research report from raw findings.
+const SYNTHESIS_PROMPT = `You are an expert research analyst creating a final, publication-ready report from raw research findings.
 
-Your task is to take the raw research notes below and transform them into a polished, professional report that:
+## Your Task
+Transform the raw research notes into a polished, comprehensive report that delivers maximum value to the reader.
 
-1. Starts with a clear, descriptive title (# Title)
-2. Includes an Executive Summary section (2-3 sentences)
-3. Organizes information into logical sections
-4. Highlights key insights and actionable recommendations
-5. Includes source URLs where available
-6. Uses clear, professional language
-7. Is well-formatted with proper markdown (headings, bullet points, bold for emphasis)
+## Report Structure
 
-Keep it concise but comprehensive. Focus on delivering value to the reader.
+1. **Title** - Create a clear, specific title that captures the essence of the research (use # heading)
 
-Raw Research Findings:
+2. **Executive Summary** - 3-4 sentences that:
+   - State the main question/topic researched
+   - Highlight the most important findings
+   - Preview key recommendations (if applicable)
+
+3. **Key Findings** - The most important discoveries, organized by theme:
+   - Use bullet points for clarity
+   - Include specific facts, numbers, and data
+   - Bold the most important points
+
+4. **Detailed Analysis** - Deeper exploration of the findings:
+   - Organize into logical subsections
+   - Explain context and significance
+   - Connect related pieces of information
+
+5. **Insights & Implications** - What does this mean?
+   - Draw conclusions from the data
+   - Identify patterns and trends
+   - Highlight what's surprising or noteworthy
+
+6. **Recommendations** (if applicable) - Actionable next steps:
+   - Be specific and practical
+   - Prioritize by importance
+   - Explain the reasoning
+
+7. **Sources** - List all referenced URLs in a clean format
+
+## Quality Guidelines
+
+- **Be Specific**: Include exact numbers, dates, names, and quotes where available
+- **Be Analytical**: Don't just report facts—explain what they mean
+- **Be Actionable**: Help the reader know what to do with this information
+- **Be Honest**: Note any limitations, uncertainties, or conflicting information
+- **Be Readable**: Use clear headings, bullet points, and visual hierarchy
+
+## Writing Style
+
+- Professional but accessible
+- Confident but not overreaching
+- Concise but comprehensive
+- Use bold for emphasis sparingly but effectively
+
+---
+
+## Raw Research Findings:
 {findings}
 
-Original Task: {taskContext}
+## Original Task:
+{taskContext}
 
-Create the final polished report:`;
+---
+
+Now create the final polished report. Make it excellent.`;
 
 interface SynthesizeRequest {
   findings: string;
@@ -56,7 +98,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Create streaming response
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -65,6 +106,7 @@ export async function POST(request: NextRequest) {
           .replace("{findings}", findings)
           .replace("{taskContext}", taskContext);
 
+        // Use a more capable configuration for synthesis
         const response = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
           method: "POST",
           headers: {
@@ -74,10 +116,14 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({
             model: "deepseek-chat",
             messages: [
+              {
+                role: "system",
+                content: "You are an expert research analyst and technical writer. Your reports are known for being clear, comprehensive, and actionable. You excel at synthesizing complex information into readable, valuable documents.",
+              },
               { role: "user", content: prompt },
             ],
-            temperature: 0.7,
-            max_tokens: 4096,
+            temperature: 0.6, // Slightly lower for more focused output
+            max_tokens: 6000, // Increased for comprehensive reports
             stream: true,
           }),
         });
