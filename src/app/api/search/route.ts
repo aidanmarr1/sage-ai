@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 
-// List of public SearXNG instances (free, no API key needed)
-const SEARXNG_INSTANCES = [
-  "https://search.sapti.me",
-  "https://searx.be",
-  "https://search.bus-hit.me",
-  "https://searx.tiekoetter.com",
-  "https://search.ononoki.org",
-];
-
 export interface SearchResult {
   title: string;
   url: string;
@@ -21,81 +12,78 @@ export interface SearchResponse {
   query: string;
 }
 
-async function trySearchInstance(instance: string, query: string): Promise<SearchResult[]> {
-  const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=general`;
-
-  const response = await fetch(url, {
-    headers: {
-      "Accept": "application/json",
-      "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
-    },
-    signal: AbortSignal.timeout(8000), // 8 second timeout
-  });
-
-  if (!response.ok) {
-    throw new Error(`Instance ${instance} returned ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  return (data.results || []).slice(0, 6).map((r: { title?: string; url?: string; content?: string }) => ({
-    title: r.title || "",
-    url: r.url || "",
-    content: r.content || "",
-  }));
-}
-
 export async function POST(request: NextRequest) {
   try {
-    // Authentication required
     const user = await getSession();
     if (!user) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const body = await request.json();
     const { query } = body;
 
     if (!query || typeof query !== "string") {
-      return NextResponse.json(
-        { error: "Query is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    // Try each SearXNG instance until one works
-    let results: SearchResult[] = [];
-    let lastError: Error | null = null;
+    // DuckDuckGo Instant Answer API - free, no key needed, returns JSON
+    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
 
-    for (const instance of SEARXNG_INSTANCES) {
-      try {
-        results = await trySearchInstance(instance, query);
-        if (results.length > 0) {
-          break; // Found results, stop trying
+    const response = await fetch(ddgUrl, {
+      headers: {
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("DuckDuckGo API failed");
+    }
+
+    const data = await response.json();
+    const results: SearchResult[] = [];
+
+    // Abstract (main answer)
+    if (data.Abstract && data.AbstractURL) {
+      results.push({
+        title: data.Heading || "Summary",
+        url: data.AbstractURL,
+        content: data.Abstract,
+      });
+    }
+
+    // Related topics
+    if (data.RelatedTopics) {
+      for (const topic of data.RelatedTopics.slice(0, 5)) {
+        if (topic.Text && topic.FirstURL) {
+          results.push({
+            title: topic.Text.split(" - ")[0] || topic.Text.substring(0, 50),
+            url: topic.FirstURL,
+            content: topic.Text,
+          });
         }
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        console.log(`SearXNG instance ${instance} failed, trying next...`);
-        continue;
+        // Handle nested topics
+        if (topic.Topics) {
+          for (const subtopic of topic.Topics.slice(0, 2)) {
+            if (subtopic.Text && subtopic.FirstURL) {
+              results.push({
+                title: subtopic.Text.split(" - ")[0] || subtopic.Text.substring(0, 50),
+                url: subtopic.FirstURL,
+                content: subtopic.Text,
+              });
+            }
+          }
+        }
       }
     }
 
-    if (results.length === 0 && lastError) {
-      console.error("All SearXNG instances failed:", lastError.message);
-    }
-
+    // If no results from instant answers, return empty but don't fail
     return NextResponse.json({
-      results,
+      results: results.slice(0, 6),
       query,
     } as SearchResponse);
+
   } catch (error) {
     console.error("Search API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 }

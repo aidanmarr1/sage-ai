@@ -16,7 +16,7 @@ import {
 
 export function PlanPanel() {
   const { currentPlan, isGenerating, updateStepStatus } = usePlanStore();
-  const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, clearActions, reset } = useAgentStore();
+  const { isExecuting, setExecuting, setCurrentStepIndex, setStepContents, addAction, completeAction, appendFindings, setLatestSearchResults, clearActions, reset } = useAgentStore();
   const { setActiveTab } = useWorkspaceStore();
 
   const handleExecute = async () => {
@@ -25,6 +25,9 @@ export function PlanPanel() {
     // Reset and start execution
     reset();
     setExecuting(true);
+
+    // Switch to computer tab to show live search results
+    setActiveTab("computer");
 
     // Store step contents for display
     setStepContents(currentPlan.steps.map((s) => s.content));
@@ -73,6 +76,11 @@ export function PlanPanel() {
                 status: "completed",
               });
             }
+          }
+
+          // Update search results for ComputerPanel
+          if (data.searchResults && data.searchResults.length > 0) {
+            setLatestSearchResults(data.searchResults);
           }
 
           // Append findings

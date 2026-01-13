@@ -76,10 +76,17 @@ interface ActionEvent {
   detail?: string;
 }
 
+interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+}
+
 interface ExecuteResponse {
   actions: ActionEvent[];
   newFindings: string;
   summary: string;
+  searchResults?: SearchResult[];
   error?: string;
 }
 
@@ -98,51 +105,49 @@ interface ChatMessage {
   tool_call_id?: string;
 }
 
-// List of public SearXNG instances (free, no API key needed)
-const SEARXNG_INSTANCES = [
-  "https://search.sapti.me",
-  "https://searx.be",
-  "https://search.bus-hit.me",
-  "https://searx.tiekoetter.com",
-  "https://search.ononoki.org",
-];
-
 async function executeSearch(query: string): Promise<{ results: Array<{ title: string; url: string; content: string }> }> {
-  // Try each SearXNG instance until one works
-  for (const instance of SEARXNG_INSTANCES) {
-    try {
-      const url = `${instance}/search?q=${encodeURIComponent(query)}&format=json&categories=general`;
+  // DuckDuckGo Instant Answer API - free, no key needed
+  const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
 
-      const response = await fetch(url, {
-        headers: {
-          "Accept": "application/json",
-          "User-Agent": "Mozilla/5.0 (compatible; SageAI/1.0)",
-        },
-        signal: AbortSignal.timeout(8000),
-      });
+  try {
+    const response = await fetch(ddgUrl, {
+      headers: { "Accept": "application/json" },
+    });
 
-      if (!response.ok) {
-        continue;
-      }
-
-      const data = await response.json();
-      const results = (data.results || []).slice(0, 5).map((r: { title?: string; url?: string; content?: string }) => ({
-        title: r.title || "",
-        url: r.url || "",
-        content: r.content || "",
-      }));
-
-      if (results.length > 0) {
-        return { results };
-      }
-    } catch (error) {
-      console.log(`SearXNG instance ${instance} failed, trying next...`);
-      continue;
+    if (!response.ok) {
+      return { results: [] };
     }
-  }
 
-  // All instances failed
-  return { results: [] };
+    const data = await response.json();
+    const results: Array<{ title: string; url: string; content: string }> = [];
+
+    // Abstract (main answer)
+    if (data.Abstract && data.AbstractURL) {
+      results.push({
+        title: data.Heading || "Summary",
+        url: data.AbstractURL,
+        content: data.Abstract,
+      });
+    }
+
+    // Related topics
+    if (data.RelatedTopics) {
+      for (const topic of data.RelatedTopics.slice(0, 4)) {
+        if (topic.Text && topic.FirstURL) {
+          results.push({
+            title: topic.Text.split(" - ")[0] || topic.Text.substring(0, 50),
+            url: topic.FirstURL,
+            content: topic.Text,
+          });
+        }
+      }
+    }
+
+    return { results: results.slice(0, 5) };
+  } catch (error) {
+    console.error("Search error:", error);
+    return { results: [] };
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -168,6 +173,7 @@ export async function POST(request: NextRequest) {
 
     const actions: ActionEvent[] = [];
     let newFindingsContent = "";
+    let latestSearchResults: SearchResult[] = [];
 
     // Add thinking action
     actions.push({
@@ -264,6 +270,7 @@ Execute this step by searching for relevant information and documenting your fin
             try {
               const searchResults = await executeSearch(query);
               const resultCount = searchResults.results.length;
+              latestSearchResults = searchResults.results;
 
               actions.push({
                 type: "search_complete",
@@ -341,6 +348,7 @@ Execute this step by searching for relevant information and documenting your fin
       actions,
       newFindings: newFindingsContent,
       summary,
+      searchResults: latestSearchResults,
     } as ExecuteResponse);
   } catch (error) {
     console.error("Agent execute error:", error);

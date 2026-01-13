@@ -5,7 +5,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { useAgentStore } from "@/stores/agentStore";
 import { Message } from "./Message";
 import { TypingIndicator } from "./TypingIndicator";
-import { AgentActionsList } from "./AgentActions";
+import { AgentActions } from "./AgentActions";
 import { Search, ArrowDown, PenLine, Lightbulb, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
@@ -139,8 +139,8 @@ export function MessageList() {
           />
         ))}
         {(actions.length > 0 || isExecuting) && (
-          <div className="mx-4 my-2 rounded-xl border border-sage-200 bg-sage-50/50 p-4">
-            <AgentActionsList />
+          <div className="mx-4 my-2">
+            <AgentActions />
           </div>
         )}
         {isTyping && <TypingIndicator />}

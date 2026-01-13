@@ -1,14 +1,21 @@
 import { create } from "zustand";
 import { nanoid } from "nanoid";
 
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+}
+
 export interface AgentAction {
   id: string;
-  type: "thinking" | "searching" | "writing" | "complete" | "error";
+  type: "thinking" | "searching" | "search_complete" | "writing" | "complete" | "error";
   label: string;
   status: "running" | "completed" | "error";
   detail?: string;
   timestamp: Date;
   stepIndex: number;
+  searchResults?: SearchResult[];
 }
 
 export interface StepExecution {
@@ -23,7 +30,8 @@ interface AgentState {
   currentStepIndex: number;
   actions: AgentAction[];
   findings: string;
-  stepContents: string[]; // Store step contents for display
+  stepContents: string[];
+  latestSearchResults: SearchResult[];
 
   // Actions
   setExecuting: (executing: boolean) => void;
@@ -32,9 +40,11 @@ interface AgentState {
   addAction: (action: Omit<AgentAction, "id" | "timestamp" | "stepIndex">) => string;
   updateAction: (id: string, updates: Partial<AgentAction>) => void;
   completeAction: (id: string) => void;
+  completeActionWithResults: (id: string, results: SearchResult[]) => void;
   errorAction: (id: string, detail?: string) => void;
   appendFindings: (content: string) => void;
   setFindings: (content: string) => void;
+  setLatestSearchResults: (results: SearchResult[]) => void;
   clearActions: () => void;
   reset: () => void;
 }
@@ -45,6 +55,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   actions: [],
   findings: "",
   stepContents: [],
+  latestSearchResults: [],
 
   setExecuting: (executing) => set({ isExecuting: executing }),
 
@@ -83,6 +94,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }));
   },
 
+  completeActionWithResults: (id, results) => {
+    set((state) => ({
+      actions: state.actions.map((action) =>
+        action.id === id
+          ? { ...action, status: "completed" as const, searchResults: results }
+          : action
+      ),
+      latestSearchResults: results,
+    }));
+  },
+
   errorAction: (id, detail) => {
     set((state) => ({
       actions: state.actions.map((action) =>
@@ -101,6 +123,8 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   setFindings: (content) => set({ findings: content }),
 
+  setLatestSearchResults: (results) => set({ latestSearchResults: results }),
+
   clearActions: () => set({ actions: [] }),
 
   reset: () =>
@@ -110,5 +134,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       actions: [],
       findings: "",
       stepContents: [],
+      latestSearchResults: [],
     }),
 }));
