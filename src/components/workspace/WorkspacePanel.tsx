@@ -4,6 +4,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { ComputerPanel } from "./ComputerPanel";
 import { PlanPanel } from "./PlanPanel";
+import { FindingsPanel } from "./FindingsPanel";
 import { TerminalView } from "@/components/terminal";
 import { FileBrowser } from "@/components/file-browser";
 
@@ -16,6 +17,7 @@ export function WorkspacePanel() {
       <div className="flex-1 overflow-hidden">
         {activeTab === "computer" && <ComputerPanel />}
         {activeTab === "plan" && <PlanPanel />}
+        {activeTab === "findings" && <FindingsPanel />}
         {activeTab === "terminal" && <TerminalView />}
         {activeTab === "files" && <FileBrowser />}
       </div>

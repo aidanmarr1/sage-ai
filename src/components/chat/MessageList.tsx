@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useChatStore } from "@/stores/chatStore";
+import { useAgentStore } from "@/stores/agentStore";
 import { Message } from "./Message";
 import { TypingIndicator } from "./TypingIndicator";
+import { AgentActionsList } from "./AgentActions";
 import { Search, ArrowDown, PenLine, Lightbulb, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/cn";
@@ -17,13 +19,14 @@ const suggestions = [
 
 export function MessageList() {
   const { messages, isTyping, addMessage, setTyping } = useChatStore();
+  const { actions, isExecuting } = useAgentStore();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping]);
+  }, [messages, isTyping, actions]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -135,6 +138,11 @@ export function MessageList() {
             }
           />
         ))}
+        {(actions.length > 0 || isExecuting) && (
+          <div className="mx-4 my-2 rounded-xl border border-sage-200 bg-sage-50/50 p-4">
+            <AgentActionsList />
+          </div>
+        )}
         {isTyping && <TypingIndicator />}
         <div ref={bottomRef} />
       </div>

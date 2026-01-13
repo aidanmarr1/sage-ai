@@ -1,6 +1,8 @@
 "use client";
 
 import { usePlanStore } from "@/stores/planStore";
+import { useAgentStore } from "@/stores/agentStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { cn } from "@/lib/cn";
 import {
   ClipboardList,
@@ -8,10 +10,96 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
+  Play,
+  Pause,
 } from "lucide-react";
 
 export function PlanPanel() {
-  const { currentPlan, isGenerating } = usePlanStore();
+  const { currentPlan, isGenerating, updateStepStatus } = usePlanStore();
+  const { isExecuting, setExecuting, setCurrentStepIndex, addAction, completeAction, appendFindings, clearActions, reset } = useAgentStore();
+  const { setActiveTab } = useWorkspaceStore();
+
+  const handleExecute = async () => {
+    if (!currentPlan || isExecuting) return;
+
+    // Reset and start execution
+    reset();
+    setExecuting(true);
+
+    try {
+      for (let i = 0; i < currentPlan.steps.length; i++) {
+        const step = currentPlan.steps[i];
+        setCurrentStepIndex(i);
+        updateStepStatus(step.id, "in_progress");
+
+        // Add thinking action
+        const thinkingId = addAction({
+          type: "thinking",
+          label: `Analyzing step ${i + 1}...`,
+          status: "running",
+        });
+
+        try {
+          const response = await fetch("/api/agent/execute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              step: step.content,
+              stepIndex: i,
+              taskContext: currentPlan.title,
+              currentFindings: useAgentStore.getState().findings,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Execution failed");
+          }
+
+          const data = await response.json();
+
+          // Complete thinking action
+          completeAction(thinkingId);
+
+          // Add all actions from response
+          for (const action of data.actions || []) {
+            if (action.type !== "thinking") { // Skip duplicate thinking
+              const actionId = addAction({
+                type: action.type,
+                label: action.label,
+                detail: action.detail,
+                status: "completed",
+              });
+            }
+          }
+
+          // Append findings
+          if (data.newFindings) {
+            appendFindings(data.newFindings);
+          }
+
+          // Mark step complete
+          updateStepStatus(step.id, "completed");
+
+        } catch (error) {
+          console.error("Step execution error:", error);
+          addAction({
+            type: "error",
+            label: `Step ${i + 1} failed`,
+            detail: error instanceof Error ? error.message : "Unknown error",
+            status: "error",
+          });
+          updateStepStatus(step.id, "pending"); // Reset to pending on error
+          break;
+        }
+      }
+
+      // Switch to findings tab when done
+      setActiveTab("findings");
+
+    } finally {
+      setExecuting(false);
+    }
+  };
 
   if (isGenerating) {
     return (
@@ -93,20 +181,27 @@ export function PlanPanel() {
             </p>
           </div>
         </div>
-        <div
-          className={cn(
-            "rounded-full px-3 py-1 text-xs font-medium",
-            currentPlan.status === "ready" &&
-              "bg-sage-100 text-sage-700",
-            currentPlan.status === "in_progress" &&
-              "bg-sage-100 text-sage-700",
-            currentPlan.status === "completed" &&
-              "bg-sage-100 text-sage-700"
+        <div className="flex items-center gap-2">
+          {currentPlan.status === "ready" && !isExecuting && (
+            <button
+              onClick={handleExecute}
+              className="flex items-center gap-2 rounded-full bg-sage-500 px-4 py-1.5 text-xs font-medium text-white shadow-md shadow-sage-500/20 transition-all hover:bg-sage-600 hover:shadow-lg"
+            >
+              <Play className="h-3.5 w-3.5" />
+              Execute
+            </button>
           )}
-        >
-          {currentPlan.status === "ready" && "Ready"}
-          {currentPlan.status === "in_progress" && "In Progress"}
-          {currentPlan.status === "completed" && "Completed"}
+          {isExecuting && (
+            <div className="flex items-center gap-2 rounded-full bg-sage-100 px-4 py-1.5 text-xs font-medium text-sage-700">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Executing...
+            </div>
+          )}
+          {currentPlan.status === "completed" && !isExecuting && (
+            <span className="rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
+              Completed
+            </span>
+          )}
         </div>
       </div>
 

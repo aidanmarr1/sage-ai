@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Terminal, FolderTree, Monitor, ClipboardList } from "lucide-react";
+import { Terminal, FolderTree, Monitor, ClipboardList, FileText } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { usePlanStore } from "@/stores/planStore";
+import { useAgentStore } from "@/stores/agentStore";
 import type { WorkspaceTab } from "@/types";
 
 const tabs: { id: WorkspaceTab; label: string; icon: React.ElementType; description: string }[] = [
   { id: "computer", label: "Computer", icon: Monitor, description: "Agent workspace" },
   { id: "plan", label: "Plan", icon: ClipboardList, description: "Current task plan" },
+  { id: "findings", label: "Findings", icon: FileText, description: "Research findings" },
   { id: "terminal", label: "Terminal", icon: Terminal, description: "Command output" },
   { id: "files", label: "Files", icon: FolderTree, description: "Browse files" },
 ];
@@ -17,9 +19,11 @@ const tabs: { id: WorkspaceTab; label: string; icon: React.ElementType; descript
 export function WorkspaceTabs() {
   const { activeTab, setActiveTab } = useWorkspaceStore();
   const { currentPlan, isGenerating } = usePlanStore();
+  const { isExecuting, findings } = useAgentStore();
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
 
   const hasPlanActivity = currentPlan !== null || isGenerating;
+  const hasFindingsActivity = isExecuting || findings.length > 0;
 
   return (
     <div className="relative flex h-14 items-center justify-between border-b border-grey-200 bg-gradient-to-r from-white via-grey-50/50 to-white px-3">
@@ -64,6 +68,12 @@ export function WorkspaceTabs() {
                 </div>
                 <span>{tab.label}</span>
                 {tab.id === "plan" && hasPlanActivity && !isActive && (
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-sage-500" />
+                  </span>
+                )}
+                {tab.id === "findings" && hasFindingsActivity && !isActive && (
                   <span className="relative flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-sage-500" />

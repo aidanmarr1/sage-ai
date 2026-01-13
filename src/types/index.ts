@@ -31,7 +31,7 @@ export interface TerminalLine {
   timestamp: Date;
 }
 
-export type WorkspaceTab = "terminal" | "files" | "computer" | "plan";
+export type WorkspaceTab = "terminal" | "files" | "computer" | "plan" | "findings";
 
 export interface SidebarItem {
   id: string;
