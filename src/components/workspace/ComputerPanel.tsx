@@ -103,54 +103,93 @@ export function ComputerPanel() {
           )}
         </div>
 
-        {/* Browser Content - Show extraction status */}
-        <div className="flex-1 overflow-hidden bg-gradient-to-br from-grey-50 to-grey-100 flex items-center justify-center">
-          <div className="flex flex-col items-center text-center px-8">
-            {browserState.status === "loading" || browserState.isActive ? (
-              <>
-                <div className="relative mb-6">
-                  <div className="absolute -inset-4 rounded-full bg-sage-200/50 blur-xl animate-pulse" />
-                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sage-500 to-sage-600 shadow-xl">
-                    <Loader2 className="h-10 w-10 animate-spin text-white" />
+        {/* Browser Content - Show screenshot if available, otherwise status */}
+        <div className="flex-1 overflow-hidden bg-gradient-to-br from-grey-50 to-grey-100">
+          {browserState.screenshot ? (
+            <div className="h-full w-full p-4">
+              <div className="relative h-full w-full overflow-hidden rounded-xl border border-grey-200 bg-white shadow-lg">
+                {/* Screenshot header */}
+                <div className="flex items-center gap-2 border-b border-grey-100 bg-grey-50 px-3 py-2">
+                  <div className="flex gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-grey-300" />
+                    <div className="h-3 w-3 rounded-full bg-grey-300" />
+                    <div className="h-3 w-3 rounded-full bg-grey-300" />
+                  </div>
+                  <div className="flex-1 mx-4">
+                    <div className="flex items-center gap-2 rounded-lg bg-white border border-grey-200 px-3 py-1 text-xs text-grey-500">
+                      <Globe className="h-3 w-3" />
+                      <span className="truncate">{browserState.currentUrl || "Loading..."}</span>
+                    </div>
                   </div>
                 </div>
-                <h3 className="font-serif text-xl font-semibold text-grey-900">
-                  Extracting Content
-                </h3>
-                <p className="mt-2 max-w-xs text-sm text-grey-500">
-                  Reading and analyzing the page content...
-                </p>
-              </>
-            ) : browserState.status === "complete" ? (
-              <>
-                <div className="relative mb-6">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sage-500 to-sage-600 shadow-xl">
-                    <Globe className="h-10 w-10 text-white" />
-                  </div>
+                {/* Screenshot image */}
+                <div className="relative h-[calc(100%-40px)] w-full overflow-auto">
+                  <img
+                    src={browserState.screenshot}
+                    alt="Browser screenshot"
+                    className="w-full object-contain"
+                  />
+                  {(browserState.isActive || browserState.status === "loading") && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
+                      <div className="flex flex-col items-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-sage-500" />
+                        <span className="mt-2 text-sm text-grey-600">Updating...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <h3 className="font-serif text-xl font-semibold text-grey-900">
-                  Content Extracted
-                </h3>
-                <p className="mt-2 max-w-xs text-sm text-grey-500">
-                  Successfully retrieved page content for analysis.
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="relative mb-6">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-grey-200 shadow-xl">
-                    <Globe className="h-10 w-10 text-grey-400" />
-                  </div>
-                </div>
-                <h3 className="font-serif text-xl font-semibold text-grey-900">
-                  Browse Failed
-                </h3>
-                <p className="mt-2 max-w-xs text-sm text-grey-500">
-                  Could not extract content from this page.
-                </p>
-              </>
-            )}
-          </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center text-center px-8">
+                {browserState.status === "loading" || browserState.isActive ? (
+                  <>
+                    <div className="relative mb-6">
+                      <div className="absolute -inset-4 rounded-full bg-sage-200/50 blur-xl animate-pulse" />
+                      <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sage-500 to-sage-600 shadow-xl">
+                        <Loader2 className="h-10 w-10 animate-spin text-white" />
+                      </div>
+                    </div>
+                    <h3 className="font-serif text-xl font-semibold text-grey-900">
+                      Extracting Content
+                    </h3>
+                    <p className="mt-2 max-w-xs text-sm text-grey-500">
+                      Reading and analyzing the page content...
+                    </p>
+                  </>
+                ) : browserState.status === "complete" ? (
+                  <>
+                    <div className="relative mb-6">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-sage-500 to-sage-600 shadow-xl">
+                        <Globe className="h-10 w-10 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="font-serif text-xl font-semibold text-grey-900">
+                      Content Extracted
+                    </h3>
+                    <p className="mt-2 max-w-xs text-sm text-grey-500">
+                      Successfully retrieved page content for analysis.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative mb-6">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-grey-200 shadow-xl">
+                        <Globe className="h-10 w-10 text-grey-400" />
+                      </div>
+                    </div>
+                    <h3 className="font-serif text-xl font-semibold text-grey-900">
+                      Browse Failed
+                    </h3>
+                    <p className="mt-2 max-w-xs text-sm text-grey-500">
+                      Could not extract content from this page.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -163,7 +202,9 @@ export function ComputerPanel() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sage-500" />
                 </span>
-                <span className="text-xs font-medium text-sage-600">Extracting</span>
+                <span className="text-xs font-medium text-sage-600">
+                  {browserState.screenshot ? "Browsing" : "Extracting"}
+                </span>
               </>
             ) : (
               <>
@@ -173,7 +214,11 @@ export function ComputerPanel() {
             )}
           </div>
           <span className="text-xs text-grey-500">
-            {browserState.status === "loading" ? "Reading page..." : "Content ready"}
+            {browserState.status === "loading"
+              ? "Reading page..."
+              : browserState.screenshot
+                ? "Screenshot captured"
+                : "Content ready"}
           </span>
         </div>
       </div>

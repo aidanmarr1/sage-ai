@@ -140,6 +140,18 @@ export function FindingsPanel() {
           </div>
         )}
       </div>
+
+      {/* Footer with word count */}
+      {findings && (
+        <div className="flex items-center justify-between border-t border-grey-100 bg-grey-50/50 px-4 py-2">
+          <span className="text-xs text-grey-400">
+            {findings.split(/\s+/).filter(Boolean).length} words
+          </span>
+          <span className="text-xs text-grey-400">
+            Last updated just now
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -231,22 +243,70 @@ function MarkdownRenderer({ content }: { content: string }) {
   );
 }
 
-// Handle inline markdown (bold, italic, links)
+// Handle inline markdown (bold, italic, links, code)
 function InlineMarkdown({ text }: { text: string }) {
-  // Handle bold **text**
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  // Handle links [text](url)
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const linkParts = text.split(linkRegex);
+
+  const processedParts: React.ReactNode[] = [];
+  for (let i = 0; i < linkParts.length; i++) {
+    if (i % 3 === 0) {
+      // Regular text - process for bold and code
+      processedParts.push(<InlineFormatting key={i} text={linkParts[i]} />);
+    } else if (i % 3 === 1) {
+      // Link text
+      const linkText = linkParts[i];
+      const linkUrl = linkParts[i + 1];
+      processedParts.push(
+        <a
+          key={i}
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sage-600 hover:text-sage-700 underline underline-offset-2"
+        >
+          {linkText}
+        </a>
+      );
+      i++; // Skip the URL part
+    }
+  }
+
+  return <>{processedParts}</>;
+}
+
+// Handle bold and inline code
+function InlineFormatting({ text }: { text: string }) {
+  // Handle inline code `code`
+  const codeParts = text.split(/(`[^`]+`)/g);
 
   return (
     <>
-      {parts.map((part, index) => {
-        if (part.startsWith("**") && part.endsWith("**")) {
+      {codeParts.map((part, index) => {
+        if (part.startsWith("`") && part.endsWith("`")) {
           return (
-            <strong key={index} className="font-semibold text-grey-900">
-              {part.slice(2, -2)}
-            </strong>
+            <code
+              key={index}
+              className="rounded bg-grey-100 px-1.5 py-0.5 font-mono text-xs text-sage-700"
+            >
+              {part.slice(1, -1)}
+            </code>
           );
         }
-        return <span key={index}>{part}</span>;
+
+        // Handle bold **text**
+        const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+        return boldParts.map((boldPart, boldIndex) => {
+          if (boldPart.startsWith("**") && boldPart.endsWith("**")) {
+            return (
+              <strong key={`${index}-${boldIndex}`} className="font-semibold text-grey-900">
+                {boldPart.slice(2, -2)}
+              </strong>
+            );
+          }
+          return <span key={`${index}-${boldIndex}`}>{boldPart}</span>;
+        });
       })}
     </>
   );
