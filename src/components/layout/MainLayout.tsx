@@ -8,8 +8,11 @@ import { ChatPanel } from "@/components/chat";
 import { WorkspacePanel } from "@/components/workspace";
 import { AuthModal } from "@/components/auth";
 import { Sidebar } from "./Sidebar";
+import { useKeyboardShortcuts } from "@/hooks";
 
 export function MainLayout() {
+  // Enable global keyboard shortcuts
+  useKeyboardShortcuts();
   const { leftPanelWidth, setLeftPanelWidth } = useUIStore();
   const { isAuthenticated, isLoading } = useAuthStore();
   const [mounted, setMounted] = useState(false);

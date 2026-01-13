@@ -14,6 +14,7 @@ export interface BrowserState {
   currentUrl: string | null;
   screenshot: string | null;
   isActive: boolean;
+  status: "idle" | "loading" | "complete" | "error";
 }
 
 export interface AgentAction {
@@ -70,6 +71,7 @@ const initialBrowserState: BrowserState = {
   currentUrl: null,
   screenshot: null,
   isActive: false,
+  status: "idle",
 };
 
 export const useAgentStore = create<AgentState>((set, get) => ({

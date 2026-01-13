@@ -30,7 +30,7 @@ export function Message({ message, isFirst = true, isLast = true }: MessageProps
         "group relative flex w-full gap-3 px-2 py-2 transition-all duration-200",
         isUser ? "flex-row-reverse" : "flex-row",
         isFirst && "mt-4",
-        "animate-fade-in"
+        "animate-slide-up"
       )}
     >
       {/* Avatar - only show on first message in group */}

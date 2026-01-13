@@ -77,7 +77,7 @@ export function MessageList() {
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center">
           {/* Animated logo */}
-          <div className="group relative mb-8">
+          <div className="group relative mb-8 animate-float">
             <Image
               src="/sage-logo.png"
               alt="Sage"
@@ -104,7 +104,7 @@ export function MessageList() {
                 <button
                   key={suggestion.label}
                   onClick={() => handleSuggestionClick(suggestion.label)}
-                  className="group/card flex items-center gap-3 rounded-2xl border border-grey-200/80 bg-white/80 px-4 py-3.5 text-left shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-sage-200 hover:bg-white hover:shadow-lg hover:shadow-sage-100/50"
+                  className="group/card animate-fade-in-up flex items-center gap-3 rounded-2xl border border-grey-200/80 bg-white/80 px-4 py-3.5 text-left shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-sage-200 hover:bg-white hover:shadow-lg hover:shadow-sage-100/50"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className={cn(
