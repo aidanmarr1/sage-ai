@@ -215,6 +215,8 @@ export function ChatInput() {
           id: nanoid(),
           content: line.replace(/^\d+[.)]\s*/, "").trim(),
           status: "pending" as const,
+          isOptional: false,
+          isEditing: false,
         }));
 
       // If no numbered steps found, use all remaining lines as steps
@@ -222,6 +224,8 @@ export function ChatInput() {
         id: nanoid(),
         content: line.trim(),
         status: "pending" as const,
+        isOptional: false,
+        isEditing: false,
       }));
 
       setPlan({

@@ -1,39 +1,129 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
+import { getSourceAuthority, type SourceAuthority } from "@/lib/source-quality";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
 const STEEL_API_KEY = process.env.STEEL_API_KEY;
 
-// Enhanced tool definitions with more capabilities
+// ============================================================================
+// ENHANCED TOOL DEFINITIONS
+// ============================================================================
+
 const TOOLS = [
+  // Enhanced reasoning with structured chain-of-thought
   {
     type: "function",
     function: {
       name: "reason",
-      description: "Think through the problem step-by-step before taking action. Use this FIRST to plan your approach, analyze what you know, identify gaps, and decide which tools to use. This helps ensure high-quality, thoughtful research.",
+      description: "Think through the problem using structured chain-of-thought. ALWAYS use this first to plan your approach. Quality thinking leads to quality results.",
       parameters: {
         type: "object",
         properties: {
-          thinking: {
+          observation: {
             type: "string",
-            description: "Your detailed reasoning about: 1) What do I need to find out? 2) What do I already know? 3) What's the best approach? 4) Which tools should I use and why?",
+            description: "What do I currently know? What information do I have so far?",
           },
-          plan: {
+          analysis: {
             type: "string",
-            description: "A brief 2-3 step plan for completing this research step",
+            description: "What patterns do I see? What does this information mean?",
+          },
+          hypothesis: {
+            type: "string",
+            description: "What might the answer be? What gaps exist in my knowledge?",
+          },
+          next_action: {
+            type: "string",
+            description: "What specific action will I take next and why?",
+          },
+          alternatives: {
+            type: "array",
+            items: { type: "string" },
+            description: "What other approaches could I take if this doesn't work?",
           },
         },
-        required: ["thinking", "plan"],
+        required: ["observation", "analysis", "next_action"],
       },
     },
   },
+
+  // Goal tracking for maintaining focus
+  {
+    type: "function",
+    function: {
+      name: "track_progress",
+      description: "Track progress toward the task goal. Use to maintain focus, identify what's left, and assess confidence.",
+      parameters: {
+        type: "object",
+        properties: {
+          original_goal: {
+            type: "string",
+            description: "Restate the user's original goal",
+          },
+          completed: {
+            type: "array",
+            items: { type: "string" },
+            description: "What has been accomplished so far",
+          },
+          remaining: {
+            type: "array",
+            items: { type: "string" },
+            description: "What still needs to be done",
+          },
+          blockers: {
+            type: "array",
+            items: { type: "string" },
+            description: "Any obstacles or missing information",
+          },
+          confidence: {
+            type: "number",
+            description: "0-100 confidence in achieving the goal with current progress",
+          },
+        },
+        required: ["original_goal", "remaining", "confidence"],
+      },
+    },
+  },
+
+  // Dynamic plan modification
+  {
+    type: "function",
+    function: {
+      name: "modify_plan",
+      description: "Modify the execution plan based on discoveries. Use when research reveals the current approach needs adjustment.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["add_step", "remove_step", "modify_current"],
+            description: "Type of plan modification",
+          },
+          target_step_index: {
+            type: "number",
+            description: "Index of step to modify (for remove_step)",
+          },
+          new_content: {
+            type: "string",
+            description: "New step content (for add_step or modify_current)",
+          },
+          reason: {
+            type: "string",
+            description: "Why this modification is needed based on current findings",
+          },
+        },
+        required: ["action", "reason"],
+      },
+    },
+  },
+
+  // Web search with query expansion
   {
     type: "function",
     function: {
       name: "web_search",
-      description: "Search the web for current information. Returns multiple results with titles, URLs, and snippets. Use specific, targeted queries for best results.",
+      description: "Search the web for current information. Returns results with authority scores. Use specific, targeted queries for best results.",
       parameters: {
         type: "object",
         properties: {
@@ -51,11 +141,13 @@ const TOOLS = [
       },
     },
   },
+
+  // Deep multi-aspect search
   {
     type: "function",
     function: {
       name: "deep_search",
-      description: "Perform a more thorough search by running multiple related queries and combining results. Use when you need comprehensive coverage of a topic or when initial search results are insufficient.",
+      description: "Perform a comprehensive search by running multiple related queries. Use when you need thorough coverage or initial results are insufficient.",
       parameters: {
         type: "object",
         properties: {
@@ -73,11 +165,13 @@ const TOOLS = [
       },
     },
   },
+
+  // Website browsing
   {
     type: "function",
     function: {
       name: "browse_website",
-      description: "Extract full content from a webpage. Use when search snippets aren't enough and you need detailed information from a specific source. Only browse the most relevant 1-2 URLs per step.",
+      description: "Extract full content from a webpage. Use when search snippets aren't enough. Only browse 1-2 most relevant high-authority sources per step.",
       parameters: {
         type: "object",
         properties: {
@@ -94,11 +188,13 @@ const TOOLS = [
       },
     },
   },
+
+  // Analysis and extraction
   {
     type: "function",
     function: {
       name: "analyze_and_extract",
-      description: "Analyze collected information to extract key insights, patterns, and structured data. Use after gathering raw information to make sense of it.",
+      description: "Analyze collected information to extract key insights, patterns, and structured data. Use after gathering raw information.",
       parameters: {
         type: "object",
         properties: {
@@ -120,11 +216,13 @@ const TOOLS = [
       },
     },
   },
+
+  // Enhanced validation with multi-source checking
   {
     type: "function",
     function: {
       name: "validate_information",
-      description: "Cross-check and validate information by looking for confirming or contradicting sources. Use for important facts that need verification.",
+      description: "Cross-check and validate information using multiple high-authority sources. ALWAYS use for claims with numbers, dates, or statistics.",
       parameters: {
         type: "object",
         properties: {
@@ -136,16 +234,23 @@ const TOOLS = [
             type: "string",
             description: "Where this claim came from",
           },
+          importance: {
+            type: "string",
+            enum: ["critical", "important", "minor"],
+            description: "How important is this claim to the overall research",
+          },
         },
-        required: ["claim"],
+        required: ["claim", "importance"],
       },
     },
   },
+
+  // Write findings with confidence
   {
     type: "function",
     function: {
       name: "write_findings",
-      description: "Document research findings in the final report. Use markdown formatting. Include sources and be specific with facts and data.",
+      description: "Document research findings. Use markdown formatting. ALWAYS include inline citations [Source](URL) for every claim.",
       parameters: {
         type: "object",
         properties: {
@@ -155,12 +260,12 @@ const TOOLS = [
           },
           content: {
             type: "string",
-            description: "Detailed markdown content with facts, insights, and sources",
+            description: "Detailed markdown content with inline citations [Source](URL) for each fact",
           },
           confidence: {
             type: "string",
             enum: ["high", "medium", "low"],
-            description: "How confident you are in this information based on source quality",
+            description: "Confidence level: 'high' = multiple authoritative sources, 'medium' = single good source, 'low' = uncertain/conflicting",
           },
           sources: {
             type: "array",
@@ -168,15 +273,17 @@ const TOOLS = [
             description: "URLs of sources used for this section",
           },
         },
-        required: ["heading", "content"],
+        required: ["heading", "content", "confidence"],
       },
     },
   },
+
+  // Enhanced self-evaluation with metrics
   {
     type: "function",
     function: {
       name: "self_evaluate",
-      description: "Evaluate your progress and decide if more research is needed. Use this before finishing to ensure quality.",
+      description: "Evaluate research quality with specific metrics. Use before finishing to ensure quality.",
       parameters: {
         type: "object",
         properties: {
@@ -184,71 +291,89 @@ const TOOLS = [
             type: "string",
             description: "Summary of what you've discovered",
           },
-          quality_assessment: {
-            type: "string",
-            enum: ["excellent", "good", "needs_more_research", "insufficient"],
-            description: "How complete and high-quality is the research so far",
+          quality_metrics: {
+            type: "object",
+            properties: {
+              source_diversity: { type: "number", description: "1-5: How many different types of sources?" },
+              fact_verification: { type: "number", description: "1-5: How well verified are key facts?" },
+              completeness: { type: "number", description: "1-5: How complete is the coverage?" },
+              actionability: { type: "number", description: "1-5: How actionable is the information?" },
+            },
+            description: "Quality metrics on 1-5 scale",
           },
-          gaps: {
-            type: "string",
-            description: "What information is still missing or unclear",
+          critical_gaps: {
+            type: "array",
+            items: { type: "string" },
+            description: "Most important missing information",
           },
-          next_action: {
+          recommendation: {
             type: "string",
-            description: "What to do next: 'complete' if done, or describe what additional research is needed",
+            enum: ["complete", "one_more_search", "need_validation", "need_deeper_research", "modify_plan"],
+            description: "What to do next",
           },
         },
-        required: ["what_i_found", "quality_assessment", "next_action"],
+        required: ["what_i_found", "quality_metrics", "recommendation"],
       },
     },
   },
 ];
 
-const SYSTEM_PROMPT = `You are Sage, an elite AI research agent with advanced reasoning capabilities. Your goal is to conduct thorough, accurate, and insightful research.
+// ============================================================================
+// ENHANCED SYSTEM PROMPT
+// ============================================================================
+
+const SYSTEM_PROMPT = `You are Sage, an elite AI research agent with advanced reasoning and verification capabilities.
 
 ## Core Principles
 
-1. **Think Before Acting**: Always use the 'reason' tool first to plan your approach. Quality thinking leads to quality results.
+1. **Think First**: ALWAYS use 'reason' tool first with structured chain-of-thought
+2. **Verify Facts**: Use 'validate_information' for ANY claim with numbers, dates, or statistics
+3. **Track Progress**: Use 'track_progress' to maintain focus on the goal
+4. **Adapt Plans**: Use 'modify_plan' when discoveries reveal better approaches
+5. **Cite Everything**: Every fact must have inline citation [Source](URL)
 
-2. **Be Thorough But Efficient**: Gather comprehensive information but don't waste time on irrelevant tangents.
+## Tool Chains (Use These Patterns)
 
-3. **Verify Important Facts**: Use 'validate_information' for critical claims. Cross-reference when possible.
+**Discovery Chain** (new topic):
+reason → web_search → browse_website (1-2 high-authority sources) → write_findings
 
-4. **Synthesize, Don't Just Collect**: Use 'analyze_and_extract' to turn raw data into insights.
+**Verification Chain** (claims with numbers/dates):
+web_search → validate_information → write_findings (note confidence)
 
-5. **Self-Monitor Quality**: Use 'self_evaluate' to assess your progress and identify gaps.
+**Comprehensive Chain** (complex topics):
+reason → deep_search → analyze_and_extract → self_evaluate → write_findings
 
-## Research Workflow
-
-For each step, follow this pattern:
-1. **REASON** - Think through what you need to find and plan your approach
-2. **SEARCH** - Use web_search or deep_search to gather information
-3. **DEEP DIVE** - Browse key sources when snippets aren't enough
-4. **ANALYZE** - Extract insights and patterns from raw data
-5. **VALIDATE** - Verify important facts when needed
-6. **EVALUATE** - Check if you have enough quality information
-7. **WRITE** - Document your findings with sources
+**Refinement Chain** (incomplete info):
+self_evaluate → track_progress → web_search (specific query) → write_findings
 
 ## Quality Standards
 
-- Include specific facts, numbers, dates, and names when available
-- Always cite sources with URLs
-- Distinguish between facts and opinions
-- Note confidence levels for uncertain information
-- Provide actionable insights, not just raw data
+- ALWAYS include inline citations: "According to [Reuters](url), the figure is X"
+- Note confidence levels: "confirmed by multiple sources" vs "single source suggests"
+- Include specific numbers, dates, names when available
+- Flag contradictions: "Source A says X, but Source B says Y"
+- Prioritize high-authority sources (.gov, .edu, major news)
 
-## Tool Selection Guide
+## Anti-Patterns (AVOID THESE)
 
-- **reason**: Start every step with this. Plan before you act.
-- **web_search**: For specific queries. Use 'news' type for recent events.
-- **deep_search**: When you need comprehensive coverage from multiple angles.
-- **browse_website**: Only for the 1-2 most promising sources that need full content.
-- **analyze_and_extract**: To synthesize raw information into insights.
-- **validate_information**: For important claims that need verification.
-- **self_evaluate**: Before finishing, to ensure quality.
-- **write_findings**: To document results with sources.
+- Searching the same query twice
+- Browsing more than 2-3 URLs without writing findings
+- Writing findings without any search
+- Skipping validation for numerical/statistical claims
+- Generic statements without citations
+- Ignoring source authority (prefer .gov, .edu, major news)
 
-Remember: Quality over quantity. It's better to have well-researched, verified information than lots of unverified claims.`;
+## Source Authority Guide
+
+- **High (80+)**: .gov, .edu, Reuters, AP, Nature, BBC, major newspapers
+- **Medium (50-79)**: Wikipedia, tech sites, regional news
+- **Low (<50)**: Blogs, social media, user-generated content
+
+Always prefer high-authority sources. Note when relying on lower-authority sources.`;
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
 interface ExecuteRequest {
   step: string;
@@ -262,6 +387,7 @@ interface SearchResult {
   url: string;
   content: string;
   favicon?: string;
+  authority?: SourceAuthority;
 }
 
 interface ChatMessage {
@@ -278,7 +404,69 @@ interface ChatMessage {
   tool_call_id?: string;
 }
 
-// Execute a single search query
+// ============================================================================
+// SMART TOOL SELECTION
+// ============================================================================
+
+function determineToolChoice(
+  iteration: number,
+  previousTools: string[],
+  hasFindings: boolean,
+  maxIterations: number
+): "auto" | "required" | { type: "function"; function: { name: string } } {
+  // First iteration: always require reasoning
+  if (iteration === 1) {
+    return { type: "function", function: { name: "reason" } };
+  }
+
+  // Second iteration: encourage search if no search yet
+  if (iteration === 2 && !previousTools.some(t => t.includes("search"))) {
+    return "required"; // Require some tool, likely search
+  }
+
+  // Near end without findings: require write_findings
+  if (iteration >= maxIterations - 2 && !hasFindings) {
+    return { type: "function", function: { name: "write_findings" } };
+  }
+
+  // Last iteration: must write or complete
+  if (iteration === maxIterations - 1 && !hasFindings) {
+    return { type: "function", function: { name: "write_findings" } };
+  }
+
+  return "auto";
+}
+
+// ============================================================================
+// DYNAMIC ITERATION LIMITS
+// ============================================================================
+
+function getMaxIterations(stepContent: string): number {
+  const content = stepContent.toLowerCase();
+  let base = 6; // Increased base from 8 to allow more thorough research
+
+  // Complex research tasks need more iterations
+  if (content.includes("comprehensive") || content.includes("thorough") || content.includes("detailed")) {
+    base += 3;
+  }
+  if (content.includes("verify") || content.includes("validate") || content.includes("fact-check")) {
+    base += 2;
+  }
+  if (content.includes("compare") || content.includes("analyze") || content.includes("contrast")) {
+    base += 2;
+  }
+  if (content.includes("research") || content.includes("investigate")) {
+    base += 1;
+  }
+
+  // Cap at reasonable maximum
+  return Math.min(base, 12);
+}
+
+// ============================================================================
+// SEARCH FUNCTIONS WITH AUTHORITY SCORING
+// ============================================================================
+
 async function executeSearch(query: string, searchType?: string): Promise<{ results: SearchResult[] }> {
   if (!SERPER_API_KEY) {
     console.error("SERPER_API_KEY not configured");
@@ -286,12 +474,14 @@ async function executeSearch(query: string, searchType?: string): Promise<{ resu
   }
 
   try {
-    // Adjust query based on search type
+    // Query expansion based on search type
     let adjustedQuery = query;
     if (searchType === "news") {
       adjustedQuery = `${query} latest news 2024 2025`;
     } else if (searchType === "academic") {
-      adjustedQuery = `${query} research study`;
+      adjustedQuery = `${query} research study peer-reviewed`;
+    } else if (searchType === "comparison") {
+      adjustedQuery = `${query} vs comparison review`;
     }
 
     const response = await fetch("https://google.serper.dev/search", {
@@ -302,7 +492,7 @@ async function executeSearch(query: string, searchType?: string): Promise<{ resu
       },
       body: JSON.stringify({
         q: adjustedQuery,
-        num: searchType === "news" ? 10 : 8,
+        num: searchType === "news" ? 12 : 10, // More results for better coverage
       }),
     });
 
@@ -314,7 +504,7 @@ async function executeSearch(query: string, searchType?: string): Promise<{ resu
     const data = await response.json();
     const organic = data.organic || [];
 
-    const results = organic.map((r: { title: string; link: string; snippet: string }) => {
+    const results: SearchResult[] = organic.map((r: { title: string; link: string; snippet: string }) => {
       let favicon: string | undefined;
       try {
         const hostname = new URL(r.link).hostname;
@@ -323,13 +513,20 @@ async function executeSearch(query: string, searchType?: string): Promise<{ resu
         favicon = undefined;
       }
 
+      // Add authority scoring
+      const authority = getSourceAuthority(r.link);
+
       return {
         title: r.title,
         url: r.link,
         content: r.snippet || "",
         favicon,
+        authority,
       };
     });
+
+    // Sort by authority score (highest first)
+    results.sort((a, b) => (b.authority?.score || 0) - (a.authority?.score || 0));
 
     return { results };
   } catch (error) {
@@ -338,7 +535,6 @@ async function executeSearch(query: string, searchType?: string): Promise<{ resu
   }
 }
 
-// Execute multiple searches for deep research
 async function executeDeepSearch(
   mainTopic: string,
   aspects: string[]
@@ -346,29 +542,37 @@ async function executeDeepSearch(
   const allResults: SearchResult[] = [];
   const seenUrls = new Set<string>();
 
-  // Search for each aspect
-  for (const aspect of aspects.slice(0, 4)) {
+  // Search for each aspect in parallel for speed
+  const searchPromises = aspects.slice(0, 4).map(aspect => {
     const query = `${mainTopic} ${aspect}`;
-    const searchResults = await executeSearch(query);
+    return executeSearch(query);
+  });
 
-    // Deduplicate results
-    for (const result of searchResults.results) {
-      if (!seenUrls.has(result.url)) {
-        seenUrls.add(result.url);
-        allResults.push(result);
+  const searchResults = await Promise.all(searchPromises);
+
+  // Combine and deduplicate
+  for (const result of searchResults) {
+    for (const r of result.results) {
+      if (!seenUrls.has(r.url)) {
+        seenUrls.add(r.url);
+        allResults.push(r);
       }
     }
   }
 
-  // Sort by relevance (results appearing in multiple searches first would be ideal,
-  // but for now just return deduplicated results)
+  // Sort by authority
+  allResults.sort((a, b) => (b.authority?.score || 0) - (a.authority?.score || 0));
+
   return {
-    results: allResults.slice(0, 15),
+    results: allResults.slice(0, 18), // More results for comprehensive coverage
     summary: `Found ${allResults.length} unique results across ${aspects.length} aspects of "${mainTopic}"`,
   };
 }
 
-// Browse and extract page content using Steel
+// ============================================================================
+// PAGE BROWSING
+// ============================================================================
+
 async function browsePage(
   url: string,
   focus?: string,
@@ -405,9 +609,9 @@ async function browsePage(
 
     let content = data.content || data.markdown || data.html || "";
 
-    // Truncate if too long
-    if (content.length > 10000) {
-      content = content.substring(0, 10000) + "\n\n[Content truncated for length...]";
+    // Increased content limit for more thorough extraction
+    if (content.length > 15000) {
+      content = content.substring(0, 15000) + "\n\n[Content truncated for length...]";
     }
 
     return {
@@ -421,47 +625,77 @@ async function browsePage(
   }
 }
 
-// Validate information by searching for confirmation
+// ============================================================================
+// ENHANCED VALIDATION
+// ============================================================================
+
 async function validateInformation(
   claim: string,
+  importance: string,
   originalSource?: string
-): Promise<{ isValid: boolean; confidence: string; evidence: string }> {
-  // Search for the claim to find corroborating sources
-  const searchResults = await executeSearch(`"${claim.substring(0, 50)}" verify fact check`);
+): Promise<{ isValid: boolean; confidence: string; evidence: string; sources: string[] }> {
+  // More thorough validation for important claims
+  const queries = [
+    `"${claim.substring(0, 50)}" verify`,
+    importance === "critical" ? `${claim.substring(0, 40)} fact check` : null,
+  ].filter(Boolean) as string[];
 
-  if (searchResults.results.length === 0) {
-    return {
-      isValid: false,
-      confidence: "low",
-      evidence: "Could not find corroborating sources",
-    };
+  const allResults: SearchResult[] = [];
+
+  for (const query of queries) {
+    const searchResults = await executeSearch(query);
+    allResults.push(...searchResults.results);
   }
 
-  // Check if multiple sources confirm the claim
-  const confirmingSources = searchResults.results.filter(r =>
-    r.content.toLowerCase().includes(claim.toLowerCase().substring(0, 30))
+  // Filter to high-authority sources only for validation
+  const highAuthorityResults = allResults.filter(r => (r.authority?.score || 0) >= 70);
+
+  // Check for confirmation
+  const confirmingSources = highAuthorityResults.filter(r =>
+    r.content.toLowerCase().includes(claim.toLowerCase().substring(0, 25))
   );
 
   if (confirmingSources.length >= 2) {
     return {
       isValid: true,
       confidence: "high",
-      evidence: `Found ${confirmingSources.length} sources confirming this information: ${confirmingSources.map(s => s.url).join(", ")}`,
+      evidence: `Confirmed by ${confirmingSources.length} authoritative sources`,
+      sources: confirmingSources.slice(0, 3).map(s => s.url),
     };
   } else if (confirmingSources.length === 1) {
     return {
       isValid: true,
       confidence: "medium",
-      evidence: `Found 1 additional source: ${confirmingSources[0].url}`,
+      evidence: `Found 1 authoritative source: ${confirmingSources[0].title}`,
+      sources: [confirmingSources[0].url],
+    };
+  }
+
+  // Check lower authority if no high authority found
+  const anyConfirming = allResults.filter(r =>
+    r.content.toLowerCase().includes(claim.toLowerCase().substring(0, 25))
+  );
+
+  if (anyConfirming.length >= 2) {
+    return {
+      isValid: true,
+      confidence: "low",
+      evidence: `Found ${anyConfirming.length} sources, but none are highly authoritative`,
+      sources: anyConfirming.slice(0, 2).map(s => s.url),
     };
   }
 
   return {
     isValid: false,
     confidence: "low",
-    evidence: "Could not confirm with additional sources",
+    evidence: "Could not confirm with additional sources. Consider this unverified.",
+    sources: [],
   };
 }
+
+// ============================================================================
+// MAIN EXECUTION HANDLER
+// ============================================================================
 
 export async function POST(request: NextRequest) {
   const user = await getSession();
@@ -482,6 +716,9 @@ export async function POST(request: NextRequest) {
   const body: ExecuteRequest = await request.json();
   const { step, stepIndex, taskContext, currentFindings } = body;
 
+  // Dynamic iteration limit based on step complexity
+  const maxIterations = getMaxIterations(step);
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -491,7 +728,8 @@ export async function POST(request: NextRequest) {
 
       let newFindingsContent = "";
       let latestSearchResults: SearchResult[] = [];
-      let reasoningContext = "";
+      let currentReasoning = "";
+      const usedTools: string[] = [];
 
       try {
         sendEvent("action", {
@@ -510,12 +748,14 @@ ${step}
 ${currentFindings ? currentFindings : "No findings yet - this is the first step."}
 
 ## Instructions
-1. First, use the 'reason' tool to think through your approach
-2. Then execute your research plan using the available tools
-3. Before finishing, use 'self_evaluate' to check quality
-4. Document your findings with 'write_findings'
+1. First, use 'reason' to plan your approach with structured thinking
+2. Use 'track_progress' to stay focused on the goal
+3. Search and browse high-authority sources (prioritize .gov, .edu, major news)
+4. Use 'validate_information' for any claims with numbers, dates, or statistics
+5. Document findings with 'write_findings' - ALWAYS include inline citations
+6. Use 'self_evaluate' before finishing to check quality
 
-Execute this step thoroughly and provide high-quality research.`;
+Execute this step thoroughly. Quality and accuracy over speed.`;
 
         const messages: ChatMessage[] = [
           { role: "system", content: SYSTEM_PROMPT },
@@ -524,7 +764,6 @@ Execute this step thoroughly and provide high-quality research.`;
 
         let continueLoop = true;
         let iterations = 0;
-        const maxIterations = 8; // Increased for more thorough research
         let hasWrittenFindings = false;
 
         sendEvent("action", {
@@ -536,6 +775,9 @@ Execute this step thoroughly and provide high-quality research.`;
         while (continueLoop && iterations < maxIterations) {
           iterations++;
 
+          // Smart tool selection based on context
+          const toolChoice = determineToolChoice(iterations, usedTools, hasWrittenFindings, maxIterations);
+
           const response = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
             method: "POST",
             headers: {
@@ -546,14 +788,13 @@ Execute this step thoroughly and provide high-quality research.`;
               model: "deepseek-chat",
               messages,
               tools: TOOLS,
-              tool_choice: iterations === 1 ? "required" : "auto",
+              tool_choice: toolChoice,
               temperature: 0.7,
-              max_tokens: 2048,
+              max_tokens: 2500, // Increased for more detailed responses
             }),
           });
 
           if (!response.ok) {
-            // Auto-retry on failure
             if (iterations < 3) {
               await new Promise(resolve => setTimeout(resolve, 1000));
               continue;
@@ -580,6 +821,7 @@ Execute this step thoroughly and provide high-quality research.`;
 
             for (const toolCall of message.tool_calls) {
               const functionName = toolCall.function.name;
+              usedTools.push(functionName);
               let args;
 
               try {
@@ -588,36 +830,116 @@ Execute this step thoroughly and provide high-quality research.`;
                 args = {};
               }
 
-              // Handle each tool
+              // ----------------------------------------------------------------
+              // TOOL: reason (enhanced)
+              // ----------------------------------------------------------------
               if (functionName === "reason") {
                 sendEvent("action", {
                   type: "thinking",
-                  label: "Planning approach...",
+                  label: "Analyzing approach...",
                   status: "running",
                 });
 
-                reasoningContext = args.thinking || "";
-                const plan = args.plan || "";
+                const observation = args.observation || "";
+                const analysis = args.analysis || "";
+                const nextAction = args.next_action || "";
+                currentReasoning = nextAction;
+
+                // Send reasoning to UI for transparency
+                sendEvent("reasoning", {
+                  observation,
+                  analysis,
+                  nextAction,
+                });
 
                 sendEvent("action", {
                   type: "thinking",
-                  label: "Planning approach...",
+                  label: "Analyzing approach...",
                   status: "completed",
                 });
 
                 messages.push({
                   role: "tool",
                   tool_call_id: toolCall.id,
-                  content: `Reasoning recorded. Your plan: ${plan}\n\nNow execute this plan using the appropriate tools.`,
+                  content: `Reasoning recorded:\n- Observation: ${observation}\n- Analysis: ${analysis}\n- Next: ${nextAction}\n\nNow execute your plan. Remember to cite sources.`,
                 });
 
+              // ----------------------------------------------------------------
+              // TOOL: track_progress
+              // ----------------------------------------------------------------
+              } else if (functionName === "track_progress") {
+                const goal = args.original_goal || "";
+                const completed = args.completed || [];
+                const remaining = args.remaining || [];
+                const confidence = args.confidence || 50;
+
+                sendEvent("action", {
+                  type: "thinking",
+                  label: `Progress: ${confidence}% confident`,
+                  status: "completed",
+                });
+
+                sendEvent("progress", {
+                  goal,
+                  completed,
+                  remaining,
+                  confidence,
+                });
+
+                let guidance = `Progress tracked:\n- Completed: ${completed.length} items\n- Remaining: ${remaining.length} items\n- Confidence: ${confidence}%\n\n`;
+
+                if (confidence < 50) {
+                  guidance += "Confidence is low. Consider deeper research or different sources.";
+                } else if (remaining.length === 0) {
+                  guidance += "All items complete! Use write_findings to document your research.";
+                } else {
+                  guidance += `Focus on: ${remaining[0]}`;
+                }
+
+                messages.push({
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  content: guidance,
+                });
+
+              // ----------------------------------------------------------------
+              // TOOL: modify_plan
+              // ----------------------------------------------------------------
+              } else if (functionName === "modify_plan") {
+                const action = args.action || "modify_current";
+                const reason = args.reason || "";
+                const newContent = args.new_content || "";
+
+                sendEvent("action", {
+                  type: "thinking",
+                  label: `Plan adjustment: ${action}`,
+                  status: "completed",
+                });
+
+                // Send plan modification event to UI
+                sendEvent("planModification", {
+                  action,
+                  reason,
+                  newContent,
+                  stepIndex,
+                });
+
+                messages.push({
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  content: `Plan modification noted: ${action}\nReason: ${reason}\n\nContinue with the adjusted approach.`,
+                });
+
+              // ----------------------------------------------------------------
+              // TOOL: web_search
+              // ----------------------------------------------------------------
               } else if (functionName === "web_search") {
                 const query = args.query || "";
                 const searchType = args.search_type || "general";
 
                 sendEvent("action", {
                   type: "searching",
-                  label: `Searching: "${query.substring(0, 35)}${query.length > 35 ? "..." : ""}"`,
+                  label: `Searching: "${query.substring(0, 40)}${query.length > 40 ? "..." : ""}"`,
                   status: "running",
                 });
 
@@ -632,8 +954,13 @@ Execute this step thoroughly and provide high-quality research.`;
 
                 sendEvent("searchResults", latestSearchResults);
 
+                // Format results with authority indicators
                 const formattedResults = searchResults.results
-                  .map((r, i) => `${i + 1}. **${r.title}**\n   URL: ${r.url}\n   ${r.content}`)
+                  .map((r, i) => {
+                    const authorityLabel = r.authority?.tier === "high" ? "★ HIGH" :
+                      r.authority?.tier === "medium" ? "◆ MED" : "○ LOW";
+                    return `${i + 1}. [${authorityLabel}] **${r.title}**\n   URL: ${r.url}\n   ${r.content}`;
+                  })
                   .join("\n\n");
 
                 messages.push({
@@ -642,13 +969,16 @@ Execute this step thoroughly and provide high-quality research.`;
                   content: formattedResults || "No results found. Try a different query.",
                 });
 
+              // ----------------------------------------------------------------
+              // TOOL: deep_search
+              // ----------------------------------------------------------------
               } else if (functionName === "deep_search") {
                 const mainTopic = args.main_topic || "";
                 const aspects = args.aspects || [];
 
                 sendEvent("action", {
                   type: "searching",
-                  label: `Deep research: "${mainTopic.substring(0, 30)}..."`,
+                  label: `Deep research: "${mainTopic.substring(0, 35)}..."`,
                   status: "running",
                 });
 
@@ -664,7 +994,11 @@ Execute this step thoroughly and provide high-quality research.`;
                 sendEvent("searchResults", latestSearchResults);
 
                 const formattedResults = deepResults.results
-                  .map((r, i) => `${i + 1}. **${r.title}**\n   URL: ${r.url}\n   ${r.content}`)
+                  .map((r, i) => {
+                    const authorityLabel = r.authority?.tier === "high" ? "★ HIGH" :
+                      r.authority?.tier === "medium" ? "◆ MED" : "○ LOW";
+                    return `${i + 1}. [${authorityLabel}] **${r.title}**\n   URL: ${r.url}\n   ${r.content}`;
+                  })
                   .join("\n\n");
 
                 messages.push({
@@ -673,6 +1007,9 @@ Execute this step thoroughly and provide high-quality research.`;
                   content: `${deepResults.summary}\n\n${formattedResults}`,
                 });
 
+              // ----------------------------------------------------------------
+              // TOOL: browse_website
+              // ----------------------------------------------------------------
               } else if (functionName === "browse_website") {
                 const url = args.url || "";
                 const focus = args.focus;
@@ -685,6 +1022,9 @@ Execute this step thoroughly and provide high-quality research.`;
                   displayUrl = url.substring(0, 35);
                 }
 
+                // Check source authority before browsing
+                const authority = getSourceAuthority(url);
+
                 sendEvent("action", {
                   type: "browsing",
                   label: `Reading: ${displayUrl}...`,
@@ -694,6 +1034,7 @@ Execute this step thoroughly and provide high-quality research.`;
                 sendEvent("browserState", {
                   currentUrl: url,
                   isActive: true,
+                  authority,
                 });
 
                 const browseResult = await browsePage(url, focus, (status) => {
@@ -711,10 +1052,14 @@ Execute this step thoroughly and provide high-quality research.`;
                     status: "completed",
                   });
 
+                  const authorityNote = authority.tier === "high" ? "High-authority source" :
+                    authority.tier === "medium" ? "Medium-authority source" :
+                    "Low-authority source - consider finding corroboration";
+
                   messages.push({
                     role: "tool",
                     tool_call_id: toolCall.id,
-                    content: `# ${browseResult.title || "Page Content"}\nURL: ${url}\n${focus ? `\nLooking for: ${focus}\n` : ""}\n${browseResult.content}`,
+                    content: `# ${browseResult.title || "Page Content"}\nURL: ${url}\nAuthority: ${authorityNote}\n${focus ? `\nLooking for: ${focus}\n` : ""}\n${browseResult.content}`,
                   });
                 } else {
                   sendEvent("action", {
@@ -730,10 +1075,11 @@ Execute this step thoroughly and provide high-quality research.`;
                   });
                 }
 
+              // ----------------------------------------------------------------
+              // TOOL: analyze_and_extract
+              // ----------------------------------------------------------------
               } else if (functionName === "analyze_and_extract") {
-                const rawData = args.raw_data || "";
                 const analysisType = args.analysis_type || "summarize";
-                const context = args.context || "";
 
                 sendEvent("action", {
                   type: "thinking",
@@ -741,7 +1087,6 @@ Execute this step thoroughly and provide high-quality research.`;
                   status: "running",
                 });
 
-                // The LLM will naturally analyze in its response
                 sendEvent("action", {
                   type: "thinking",
                   label: `Analyzing: ${analysisType}...`,
@@ -751,20 +1096,24 @@ Execute this step thoroughly and provide high-quality research.`;
                 messages.push({
                   role: "tool",
                   tool_call_id: toolCall.id,
-                  content: `Analysis request recorded. Now synthesize these insights and use write_findings to document your ${analysisType} analysis.`,
+                  content: `Analysis request recorded. Now synthesize these insights and use write_findings to document your ${analysisType} analysis. Remember to include citations.`,
                 });
 
+              // ----------------------------------------------------------------
+              // TOOL: validate_information (enhanced)
+              // ----------------------------------------------------------------
               } else if (functionName === "validate_information") {
                 const claim = args.claim || "";
                 const source = args.source;
+                const importance = args.importance || "important";
 
                 sendEvent("action", {
                   type: "searching",
-                  label: "Validating information...",
+                  label: `Validating: "${claim.substring(0, 30)}..."`,
                   status: "running",
                 });
 
-                const validation = await validateInformation(claim, source);
+                const validation = await validateInformation(claim, importance, source);
 
                 sendEvent("action", {
                   type: "search_complete",
@@ -772,40 +1121,23 @@ Execute this step thoroughly and provide high-quality research.`;
                   status: "completed",
                 });
 
-                messages.push({
-                  role: "tool",
-                  tool_call_id: toolCall.id,
-                  content: `Validation Result:\n- Confidence: ${validation.confidence}\n- Evidence: ${validation.evidence}\n\nUse this to inform your findings.`,
+                // Send validation results to UI
+                sendEvent("validation", {
+                  claim,
+                  confidence: validation.confidence,
+                  isValid: validation.isValid,
+                  sources: validation.sources,
                 });
-
-              } else if (functionName === "self_evaluate") {
-                const whatFound = args.what_i_found || "";
-                const quality = args.quality_assessment || "good";
-                const gaps = args.gaps || "";
-                const nextAction = args.next_action || "complete";
-
-                sendEvent("action", {
-                  type: "thinking",
-                  label: `Self-evaluation: ${quality}`,
-                  status: "completed",
-                });
-
-                let response = `Self-Evaluation Complete:\n- Quality: ${quality}\n- Gaps: ${gaps || "None identified"}\n`;
-
-                if (quality === "needs_more_research" || quality === "insufficient") {
-                  response += `\nRecommendation: Continue research to address gaps.`;
-                } else if (!hasWrittenFindings) {
-                  response += `\nReminder: Use write_findings to document your research before finishing.`;
-                } else {
-                  response += `\nYou may conclude this step.`;
-                }
 
                 messages.push({
                   role: "tool",
                   tool_call_id: toolCall.id,
-                  content: response,
+                  content: `Validation Result:\n- Confidence: ${validation.confidence}\n- Valid: ${validation.isValid}\n- Evidence: ${validation.evidence}\n- Sources: ${validation.sources.join(", ") || "None found"}\n\nInclude this confidence level when writing your findings.`,
                 });
 
+              // ----------------------------------------------------------------
+              // TOOL: write_findings
+              // ----------------------------------------------------------------
               } else if (functionName === "write_findings") {
                 const heading = args.heading || "Findings";
                 const content = args.content || "";
@@ -818,14 +1150,19 @@ Execute this step thoroughly and provide high-quality research.`;
                   status: "running",
                 });
 
-                let newSection = `\n## ${heading}\n\n${content}\n`;
+                // Build section with clear confidence indicators
+                let newSection = `\n## ${heading}\n\n`;
+
+                if (confidence === "high") {
+                  newSection += `*✓ High confidence - verified by multiple authoritative sources*\n\n`;
+                } else if (confidence === "low") {
+                  newSection += `*⚠ Low confidence - limited verification*\n\n`;
+                }
+
+                newSection += `${content}\n`;
 
                 if (sources.length > 0) {
                   newSection += `\n**Sources:** ${sources.join(", ")}\n`;
-                }
-
-                if (confidence !== "high") {
-                  newSection += `\n*Confidence: ${confidence}*\n`;
                 }
 
                 newFindingsContent += newSection;
@@ -842,17 +1179,68 @@ Execute this step thoroughly and provide high-quality research.`;
                 messages.push({
                   role: "tool",
                   tool_call_id: toolCall.id,
-                  content: `Added "${heading}" to findings. ${!args.sources?.length ? "Remember to include source URLs when available." : ""}`,
+                  content: `Added "${heading}" to findings with ${confidence} confidence. ${sources.length === 0 ? "Note: No sources provided - please add inline citations to the content." : ""}`,
+                });
+
+              // ----------------------------------------------------------------
+              // TOOL: self_evaluate (enhanced)
+              // ----------------------------------------------------------------
+              } else if (functionName === "self_evaluate") {
+                const whatFound = args.what_i_found || "";
+                const metrics = args.quality_metrics || {};
+                const gaps = args.critical_gaps || [];
+                const recommendation = args.recommendation || "complete";
+
+                // Calculate average quality score
+                const metricValues = Object.values(metrics).filter((v): v is number => typeof v === "number");
+                const avgQuality = metricValues.length > 0
+                  ? metricValues.reduce((a, b) => a + b, 0) / metricValues.length
+                  : 3;
+
+                const qualityLabel = avgQuality >= 4 ? "excellent" : avgQuality >= 3 ? "good" : "needs improvement";
+
+                sendEvent("action", {
+                  type: "thinking",
+                  label: `Self-evaluation: ${qualityLabel}`,
+                  status: "completed",
+                });
+
+                sendEvent("quality", {
+                  metrics,
+                  avgQuality,
+                  gaps,
+                  recommendation,
+                });
+
+                let guidance = `Self-Evaluation Complete:\n`;
+                guidance += `- Overall Quality: ${qualityLabel} (${avgQuality.toFixed(1)}/5)\n`;
+                guidance += `- Source Diversity: ${metrics.source_diversity || "?"}/5\n`;
+                guidance += `- Fact Verification: ${metrics.fact_verification || "?"}/5\n`;
+                guidance += `- Completeness: ${metrics.completeness || "?"}/5\n`;
+                guidance += `- Gaps: ${gaps.length > 0 ? gaps.join(", ") : "None identified"}\n`;
+                guidance += `- Recommendation: ${recommendation}\n\n`;
+
+                if (recommendation === "complete" && hasWrittenFindings) {
+                  guidance += "Research is complete. Good work!";
+                } else if (!hasWrittenFindings) {
+                  guidance += "IMPORTANT: Use write_findings to document your research before finishing.";
+                } else if (recommendation !== "complete") {
+                  guidance += `Action needed: ${recommendation}`;
+                }
+
+                messages.push({
+                  role: "tool",
+                  tool_call_id: toolCall.id,
+                  content: guidance,
                 });
               }
             }
           } else {
-            // No more tool calls - check if we should continue
+            // No tool calls - check if we should continue
             if (!hasWrittenFindings && iterations < maxIterations - 1) {
-              // Encourage the agent to write findings
               messages.push({
                 role: "user",
-                content: "You haven't documented your findings yet. Please use write_findings to add your research to the report.",
+                content: "You haven't documented your findings yet. Please use write_findings to add your research to the report. Remember to include inline citations [Source](URL) for each fact.",
               });
             } else {
               continueLoop = false;
@@ -874,6 +1262,8 @@ Execute this step thoroughly and provide high-quality research.`;
           newFindings: newFindingsContent,
           searchResults: latestSearchResults,
           iterations,
+          maxIterations,
+          toolsUsed: usedTools,
         });
 
       } catch (error) {

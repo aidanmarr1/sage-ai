@@ -4,56 +4,76 @@ import { getSession } from "@/lib/auth";
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
-const SYNTHESIS_PROMPT = `You are an expert research analyst creating a final, publication-ready report from raw research findings.
+const SYNTHESIS_PROMPT = `You are an expert research analyst creating a publication-ready report with rigorous source attribution.
 
-## Your Task
-Transform the raw research notes into a polished, comprehensive report that delivers maximum value to the reader.
+## Critical Requirements: Source Attribution
+
+1. **Inline Citations**: EVERY factual claim MUST have an inline citation in format [Source Name](URL)
+2. **Citation Grouping**: If multiple sources support a claim, list all: [Source 1](url1), [Source 2](url2)
+3. **Confidence Indicators**:
+   - Use "According to [Source]..." for single-source claims
+   - Use "Multiple sources confirm..." for well-supported facts
+   - Use "Some sources suggest..." for less certain information
+4. **Contradiction Handling**: Explicitly note when sources disagree
+5. **Date Attribution**: Include dates for time-sensitive information
 
 ## Report Structure
 
-1. **Title** - Create a clear, specific title that captures the essence of the research (use # heading)
+### 1. Title (# heading)
+Create a clear, specific title that captures the essence of the research.
 
-2. **Executive Summary** - 3-4 sentences that:
-   - State the main question/topic researched
-   - Highlight the most important findings
-   - Preview key recommendations (if applicable)
+### 2. Executive Summary
+3-4 sentences with overall confidence assessment:
+- Main question/topic researched
+- Most important findings (with confidence level)
+- Key recommendations (if applicable)
 
-3. **Key Findings** - The most important discoveries, organized by theme:
-   - Use bullet points for clarity
-   - Include specific facts, numbers, and data
-   - Bold the most important points
+### 3. Key Findings
+Most important discoveries with inline citations:
+- Use bullet points for clarity
+- **Bold** the most important points
+- Include specific facts, numbers, dates
+- Each bullet MUST have at least one citation
 
-4. **Detailed Analysis** - Deeper exploration of the findings:
-   - Organize into logical subsections
-   - Explain context and significance
-   - Connect related pieces of information
+### 4. Detailed Analysis
+Deeper exploration organized by theme:
+- Use ## subheadings for each theme
+- Cite every factual statement
+- Explain context and significance
+- Note confidence levels throughout
 
-5. **Insights & Implications** - What does this mean?
-   - Draw conclusions from the data
-   - Identify patterns and trends
-   - Highlight what's surprising or noteworthy
+### 5. Evidence Quality Assessment
+Brief evaluation of the research quality:
+- Source diversity (how many types of sources?)
+- Source authority (government, academic, news, etc.)
+- Any information gaps or limitations
+- Contradictions found (if any)
 
-6. **Recommendations** (if applicable) - Actionable next steps:
-   - Be specific and practical
-   - Prioritize by importance
-   - Explain the reasoning
+### 6. Recommendations (if applicable)
+Actionable next steps with supporting evidence:
+- Specific and practical suggestions
+- Cite the evidence supporting each recommendation
+- Note any caveats or conditions
 
-7. **Sources** - List all referenced URLs in a clean format
+### 7. Sources
+Complete list of all referenced sources:
+- Group by authority level (High/Medium/Low)
+- Include the domain and title for each
 
-## Quality Guidelines
+## Quality Standards
 
-- **Be Specific**: Include exact numbers, dates, names, and quotes where available
-- **Be Analytical**: Don't just report facts—explain what they mean
-- **Be Actionable**: Help the reader know what to do with this information
-- **Be Honest**: Note any limitations, uncertainties, or conflicting information
-- **Be Readable**: Use clear headings, bullet points, and visual hierarchy
+- **Cite Everything**: No unsourced factual claims
+- **Be Specific**: Include exact numbers, dates, names
+- **Be Transparent**: Note uncertainty and limitations
+- **Be Analytical**: Explain what the findings mean
+- **Be Balanced**: Present multiple perspectives when they exist
 
 ## Writing Style
 
 - Professional but accessible
-- Confident but not overreaching
-- Concise but comprehensive
-- Use bold for emphasis sparingly but effectively
+- Evidence-based and verifiable
+- Transparent about limitations
+- Use markdown formatting effectively
 
 ---
 
@@ -65,7 +85,7 @@ Transform the raw research notes into a polished, comprehensive report that deli
 
 ---
 
-Now create the final polished report. Make it excellent.`;
+Create the final polished report. Ensure EVERY fact has a citation.`;
 
 interface SynthesizeRequest {
   findings: string;
