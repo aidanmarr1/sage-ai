@@ -11,6 +11,8 @@ import {
   Lightbulb,
   ArrowRight,
   ListTree,
+  Sparkles,
+  Clock,
 } from "lucide-react";
 
 interface ReasoningPanelProps {
@@ -34,27 +36,43 @@ export function ReasoningPanel({ className }: ReasoningPanelProps) {
   }
 
   return (
-    <div className={cn("border-b border-grey-100 bg-sage-50/50", className)}>
+    <div className={cn("border-b border-grey-100 bg-gradient-to-r from-sage-50/80 to-sage-50/30", className)}>
       {/* Collapsed view - click to expand */}
       <button
         onClick={toggleReasoningExpanded}
-        className="w-full flex items-center gap-2 px-6 py-2 hover:bg-sage-50 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-sage-50/50 transition-colors text-left group"
       >
-        <Brain className="h-4 w-4 text-sage-600 flex-shrink-0" />
-        <span className="text-xs text-sage-700 truncate flex-1">
-          {currentReasoning || latestReasoning?.nextAction || "Analyzing..."}
-        </span>
-        {reasoningExpanded ? (
-          <ChevronUp className="h-4 w-4 text-sage-500 flex-shrink-0" />
-        ) : (
-          <ChevronDown className="h-4 w-4 text-sage-500 flex-shrink-0" />
-        )}
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sage-100 group-hover:bg-sage-200 transition-colors">
+          <Brain className="h-4 w-4 text-sage-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-sage-700 uppercase tracking-wide">
+              Agent Reasoning
+            </span>
+            {isExecuting && (
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-sage-500" />
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-grey-700 truncate mt-0.5">
+            {currentReasoning || latestReasoning?.nextAction || "Analyzing the task..."}
+          </p>
+        </div>
+        <div className={cn(
+          "flex h-7 w-7 items-center justify-center rounded-lg transition-all",
+          reasoningExpanded ? "bg-sage-200 rotate-180" : "bg-transparent"
+        )}>
+          <ChevronDown className="h-4 w-4 text-sage-600" />
+        </div>
       </button>
 
       {/* Expanded view */}
       {reasoningExpanded && latestReasoning && (
-        <div className="px-6 pb-4 space-y-3 animate-fade-in-up">
-          <ReasoningEntryCard entry={latestReasoning} />
+        <div className="px-5 pb-4 space-y-4 animate-fade-in-up">
+          <ReasoningEntryCard entry={latestReasoning} isLatest />
 
           {/* Show history if there's more than one entry */}
           {reasoningHistory.length > 1 && (
@@ -66,56 +84,69 @@ export function ReasoningPanel({ className }: ReasoningPanelProps) {
   );
 }
 
-function ReasoningEntryCard({ entry }: { entry: ReasoningEntry }) {
+function ReasoningEntryCard({ entry, isLatest = false }: { entry: ReasoningEntry; isLatest?: boolean }) {
   return (
-    <div className="space-y-2">
+    <div className={cn(
+      "rounded-xl border p-4 space-y-3",
+      isLatest
+        ? "bg-white border-sage-200 shadow-sm"
+        : "bg-grey-50/50 border-grey-200"
+    )}>
       {/* Observation */}
       {entry.observation && (
-        <div className="flex gap-2">
-          <Eye className="h-4 w-4 text-grey-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
+        <div className="flex gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-grey-100 flex-shrink-0">
+            <Eye className="h-3.5 w-3.5 text-grey-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-grey-500 uppercase tracking-wide">
               Observation
             </span>
-            <p className="text-sm text-grey-700 mt-0.5">{entry.observation}</p>
+            <p className="text-sm text-grey-700 mt-1 leading-relaxed">{entry.observation}</p>
           </div>
         </div>
       )}
 
       {/* Analysis */}
       {entry.analysis && (
-        <div className="flex gap-2">
-          <Lightbulb className="h-4 w-4 text-grey-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
+        <div className="flex gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-grey-100 flex-shrink-0">
+            <Lightbulb className="h-3.5 w-3.5 text-grey-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-grey-500 uppercase tracking-wide">
               Analysis
             </span>
-            <p className="text-sm text-grey-700 mt-0.5">{entry.analysis}</p>
+            <p className="text-sm text-grey-700 mt-1 leading-relaxed">{entry.analysis}</p>
           </div>
         </div>
       )}
 
       {/* Hypothesis */}
       {entry.hypothesis && (
-        <div className="flex gap-2">
-          <ListTree className="h-4 w-4 text-grey-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <span className="text-xs font-medium text-grey-500 uppercase tracking-wide">
+        <div className="flex gap-3">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-grey-100 flex-shrink-0">
+            <ListTree className="h-3.5 w-3.5 text-grey-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-semibold text-grey-500 uppercase tracking-wide">
               Hypothesis
             </span>
-            <p className="text-sm text-grey-700 mt-0.5">{entry.hypothesis}</p>
+            <p className="text-sm text-grey-700 mt-1 leading-relaxed">{entry.hypothesis}</p>
           </div>
         </div>
       )}
 
-      {/* Next Action */}
-      <div className="flex gap-2 p-2 bg-sage-100/50 rounded-lg">
-        <ArrowRight className="h-4 w-4 text-sage-600 flex-shrink-0 mt-0.5" />
-        <div>
-          <span className="text-xs font-medium text-sage-600 uppercase tracking-wide">
+      {/* Next Action - highlighted */}
+      <div className="flex gap-3 p-3 bg-sage-50 rounded-lg border border-sage-100">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sage-200 flex-shrink-0">
+          <ArrowRight className="h-3.5 w-3.5 text-sage-700" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-semibold text-sage-600 uppercase tracking-wide">
             Next Action
           </span>
-          <p className="text-sm text-sage-800 font-medium mt-0.5">
+          <p className="text-sm text-sage-800 font-medium mt-1">
             {entry.nextAction}
           </p>
         </div>
@@ -123,9 +154,12 @@ function ReasoningEntryCard({ entry }: { entry: ReasoningEntry }) {
 
       {/* Alternatives */}
       {entry.alternatives && entry.alternatives.length > 0 && (
-        <div className="text-xs text-grey-500">
-          <span className="font-medium">Alternatives: </span>
-          {entry.alternatives.join(", ")}
+        <div className="flex items-start gap-2 text-xs text-grey-500 pt-1">
+          <Sparkles className="h-3 w-3 mt-0.5 flex-shrink-0" />
+          <span>
+            <span className="font-medium">Alternatives considered: </span>
+            {entry.alternatives.join(" • ")}
+          </span>
         </div>
       )}
     </div>
@@ -139,43 +173,45 @@ function ReasoningHistory({ entries }: { entries: ReasoningEntry[] }) {
   const sortedEntries = [...entries].reverse();
 
   return (
-    <div className="border-t border-sage-200/50 pt-2 mt-2">
+    <div className="border-t border-sage-100/50 pt-3">
       <button
         onClick={() => setShowHistory(!showHistory)}
-        className="text-xs text-sage-600 hover:text-sage-700 flex items-center gap-1"
+        className="flex items-center gap-2 text-xs font-medium text-sage-600 hover:text-sage-700 transition-colors"
       >
         {showHistory ? (
           <>
-            <ChevronUp className="h-3 w-3" />
+            <ChevronUp className="h-3.5 w-3.5" />
             Hide previous reasoning ({entries.length})
           </>
         ) : (
           <>
-            <ChevronDown className="h-3 w-3" />
-            Show previous reasoning ({entries.length})
+            <ChevronDown className="h-3.5 w-3.5" />
+            View previous reasoning ({entries.length})
           </>
         )}
       </button>
 
       {showHistory && (
-        <div className="mt-2 space-y-3">
+        <div className="mt-3 space-y-3">
           {sortedEntries.map((entry) => (
             <div
               key={entry.id}
-              className="pl-3 border-l-2 border-grey-200 opacity-70"
+              className="relative pl-4 border-l-2 border-grey-200 opacity-80 hover:opacity-100 transition-opacity"
             >
-              <div className="text-xs text-grey-500 mb-1">
-                Step {entry.stepIndex + 1} ·{" "}
-                {new Date(entry.timestamp).toLocaleTimeString()}
+              <div className="flex items-center gap-2 text-xs text-grey-500 mb-1.5">
+                <Clock className="h-3 w-3" />
+                <span>Step {entry.stepIndex + 1}</span>
+                <span>•</span>
+                <span>{new Date(entry.timestamp).toLocaleTimeString()}</span>
               </div>
-              <div className="text-xs text-grey-600">
-                <span className="font-medium">→</span> {entry.nextAction}
+              <div className="flex items-start gap-2">
+                <ArrowRight className="h-3.5 w-3.5 text-sage-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-grey-700">{entry.nextAction}</p>
               </div>
               {entry.observation && (
-                <div className="text-xs text-grey-500 mt-1">
-                  {entry.observation.substring(0, 100)}
-                  {entry.observation.length > 100 && "..."}
-                </div>
+                <p className="text-xs text-grey-500 mt-1 line-clamp-2 ml-5">
+                  {entry.observation}
+                </p>
               )}
             </div>
           ))}
@@ -201,19 +237,20 @@ export function CompactReasoningIndicator({
     <div className={cn("text-xs", className)}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 text-sage-600 hover:text-sage-700 transition-colors"
+        className="flex items-center gap-2 text-sage-600 hover:text-sage-700 transition-colors group"
       >
-        <Brain className="h-3 w-3" />
+        <div className="flex h-5 w-5 items-center justify-center rounded bg-sage-100 group-hover:bg-sage-200 transition-colors">
+          <Brain className="h-3 w-3" />
+        </div>
         <span className="truncate max-w-[200px]">{reasoning}</span>
-        {expanded ? (
-          <ChevronUp className="h-3 w-3 flex-shrink-0" />
-        ) : (
-          <ChevronDown className="h-3 w-3 flex-shrink-0" />
-        )}
+        <ChevronDown className={cn(
+          "h-3 w-3 flex-shrink-0 transition-transform",
+          expanded && "rotate-180"
+        )} />
       </button>
 
       {expanded && (
-        <div className="mt-2 p-2 bg-sage-50 rounded-lg text-grey-700 animate-fade-in-up">
+        <div className="mt-2 p-3 bg-sage-50 rounded-lg text-grey-700 animate-fade-in-up border border-sage-100">
           {reasoning}
         </div>
       )}

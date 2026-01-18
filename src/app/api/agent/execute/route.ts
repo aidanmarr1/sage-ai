@@ -1668,6 +1668,13 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
           status: "error",
         });
         sendEvent("done", { error: "Internal server error" });
+      } finally {
+        // Always cleanup browser session to prevent memory leaks
+        try {
+          await closeBrowserSession();
+        } catch (cleanupError) {
+          console.error("Browser cleanup error:", cleanupError);
+        }
       }
 
       controller.close();
