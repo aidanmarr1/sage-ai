@@ -1,14 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { useAgentStore } from "@/stores/agentStore";
-import { Monitor, Search, Globe, ExternalLink, Loader2, Bookmark, ArrowUpRight, SortAsc, SortDesc } from "lucide-react";
+import { Monitor, Search, Globe, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { SourceAuthorityBadge, AuthorityIndicator } from "@/components/ui/SourceAuthorityBadge";
 
 export function ComputerPanel() {
-  const { isExecuting, latestSearchResults, actions, browserState, addPrioritizedUrl, userPrioritizedUrls } = useAgentStore();
-  const [sortByAuthority, setSortByAuthority] = useState(true);
+  const { isExecuting, latestSearchResults, actions, browserState } = useAgentStore();
 
   // Get the most recent search action
   const recentSearchAction = [...actions].reverse().find(
@@ -16,11 +13,6 @@ export function ComputerPanel() {
   );
   const isSearching = recentSearchAction?.status === "running";
   const searchQuery = recentSearchAction?.label?.replace('Searching "', '').replace('"', '').replace('...', '');
-
-  // Sort results by authority or keep original order
-  const sortedResults = sortByAuthority
-    ? [...latestSearchResults].sort((a, b) => (b.authority?.score || 0) - (a.authority?.score || 0))
-    : latestSearchResults;
 
   // Get the most recent browsing action
   const recentBrowseAction = [...actions].reverse().find(
@@ -257,31 +249,6 @@ export function ComputerPanel() {
         )}
       </div>
 
-      {/* Search Results Header with Sort Toggle */}
-      {latestSearchResults.length > 0 && (
-        <div className="flex items-center justify-between px-4 py-2 border-b border-grey-100 bg-grey-50/50">
-          <span className="text-xs text-grey-500">
-            {latestSearchResults.length} results
-          </span>
-          <button
-            onClick={() => setSortByAuthority(!sortByAuthority)}
-            className="flex items-center gap-1 text-xs text-grey-600 hover:text-sage-600 transition-colors"
-          >
-            {sortByAuthority ? (
-              <>
-                <SortDesc className="h-3 w-3" />
-                By authority
-              </>
-            ) : (
-              <>
-                <SortAsc className="h-3 w-3" />
-                By relevance
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
       {/* Search Results */}
       <div className="flex-1 overflow-y-auto p-4">
         {latestSearchResults.length === 0 && isSearching ? (
@@ -316,97 +283,59 @@ export function ComputerPanel() {
           </div>
         ) : (
           <div className="space-y-2">
-            {sortedResults.map((result, index) => {
-              const isPrioritized = userPrioritizedUrls.includes(result.url);
-
-              return (
-                <div
-                  key={index}
-                  className={cn(
-                    "group animate-fade-in-up rounded-lg border bg-white p-3 transition-all hover:shadow-sm",
-                    isPrioritized
-                      ? "border-sage-300 bg-sage-50/30"
-                      : "border-grey-200 hover:border-sage-200"
-                  )}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* Favicon with authority indicator */}
-                    <div className="relative flex-shrink-0">
-                      <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden bg-grey-100">
-                        {result.favicon ? (
-                          <img
-                            src={result.favicon}
-                            alt=""
-                            className="h-5 w-5"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <Globe className={`h-4 w-4 text-grey-400 ${result.favicon ? 'hidden' : ''}`} />
-                      </div>
-                      <AuthorityIndicator
-                        authority={result.authority}
-                        className="absolute -bottom-0.5 -right-0.5 ring-1 ring-white"
+            {latestSearchResults.map((result, index) => (
+              <div
+                key={index}
+                className="group animate-fade-in-up rounded-lg border border-grey-200 bg-white p-3 transition-all hover:border-sage-200 hover:shadow-sm"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Favicon */}
+                  <div className="flex-shrink-0 flex h-6 w-6 items-center justify-center rounded overflow-hidden bg-grey-100">
+                    {result.favicon ? (
+                      <img
+                        src={result.favicon}
+                        alt=""
+                        className="h-5 w-5"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
                       />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      {/* Title with authority badge */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-medium text-grey-900 text-sm line-clamp-1">
-                          {result.title}
-                        </h3>
-                        <SourceAuthorityBadge authority={result.authority} size="sm" />
-                      </div>
-
-                      <p className="text-xs text-grey-600 line-clamp-2 mt-1">
-                        {result.content}
-                      </p>
-
-                      {/* Actions row */}
-                      <div className="flex items-center gap-3 mt-2">
-                        <a
-                          href={result.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-sage-600 hover:text-sage-700"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Open
-                        </a>
-
-                        <button
-                          onClick={() => addPrioritizedUrl(result.url)}
-                          className={cn(
-                            "inline-flex items-center gap-1 text-xs transition-colors",
-                            isPrioritized
-                              ? "text-sage-600"
-                              : "text-grey-400 hover:text-sage-600 opacity-0 group-hover:opacity-100"
-                          )}
-                          title="Prioritize this source"
-                        >
-                          <Bookmark className={cn("h-3 w-3", isPrioritized && "fill-current")} />
-                          {isPrioritized ? "Prioritized" : "Prioritize"}
-                        </button>
-
-                        <span className="text-xs text-grey-400 ml-auto truncate max-w-[150px]">
-                          {(() => {
-                            try {
-                              return new URL(result.url).hostname;
-                            } catch {
-                              return result.url.substring(0, 30);
-                            }
-                          })()}
-                        </span>
-                      </div>
+                    ) : null}
+                    <Globe className={`h-4 w-4 text-grey-400 ${result.favicon ? 'hidden' : ''}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-grey-900 text-sm line-clamp-1">
+                      {result.title}
+                    </h3>
+                    <p className="text-xs text-grey-600 line-clamp-2 mt-1">
+                      {result.content}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a
+                        href={result.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-sage-600 hover:text-sage-700"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Open
+                      </a>
+                      <span className="text-xs text-grey-400 truncate">
+                        {(() => {
+                          try {
+                            return new URL(result.url).hostname;
+                          } catch {
+                            return result.url.substring(0, 30);
+                          }
+                        })()}
+                      </span>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>
