@@ -23,6 +23,7 @@ interface ConversationState {
   createConversation: (title: string) => Promise<Conversation | null>;
   deleteConversation: (id: string) => Promise<void>;
   toggleStar: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
 }
 
 export const useConversationStore = create<ConversationState>((set, get) => ({
@@ -130,6 +131,45 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       set((state) => ({
         conversations: state.conversations.map((c) =>
           c.id === id ? { ...c, starred: !newStarred } : c
+        ),
+      }));
+    }
+  },
+
+  renameConversation: async (id: string, title: string) => {
+    const conv = get().conversations.find((c) => c.id === id);
+    if (!conv) return;
+
+    const oldTitle = conv.title;
+
+    // Optimistic update
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === id ? { ...c, title } : c
+      ),
+    }));
+
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!res.ok) {
+        // Revert on failure
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, title: oldTitle } : c
+          ),
+        }));
+      }
+    } catch (error) {
+      console.error("Failed to rename conversation:", error);
+      // Revert on error
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === id ? { ...c, title: oldTitle } : c
         ),
       }));
     }

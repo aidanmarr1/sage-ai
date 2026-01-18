@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Home,
   Settings,
@@ -12,6 +12,7 @@ import {
   HelpCircle,
   LogOut,
   ChevronDown,
+  ChevronRight,
   Plus,
   Command,
   Crown,
@@ -19,17 +20,25 @@ import {
   Search,
   Star,
   Trash2,
+  Clock,
+  Calendar,
+  Pencil,
+  Check,
+  X,
+  Filter,
+  Archive,
+  FolderOpen,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { useUIStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
-import { useConversationStore } from "@/stores/conversationStore";
+import { useConversationStore, type Conversation } from "@/stores/conversationStore";
 import { useChatStore } from "@/stores/chatStore";
 import { usePlanStore } from "@/stores/planStore";
 import { useSearchStore } from "@/stores/searchStore";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isToday, isYesterday, isThisWeek, subDays } from "date-fns";
 
 type NavItem = {
   id: string;
@@ -50,6 +59,43 @@ const secondaryNavItems: NavItem[] = [
   { id: "settings", label: "Settings", icon: Settings, badge: null, shortcut: "," },
 ];
 
+type FilterType = "all" | "starred" | "recent";
+
+// Group conversations by date
+function groupConversations(conversations: Conversation[]) {
+  const groups: {
+    starred: Conversation[];
+    today: Conversation[];
+    yesterday: Conversation[];
+    thisWeek: Conversation[];
+    earlier: Conversation[];
+  } = {
+    starred: [],
+    today: [],
+    yesterday: [],
+    thisWeek: [],
+    earlier: [],
+  };
+
+  conversations.forEach((conv) => {
+    const date = new Date(conv.updatedAt);
+
+    if (conv.starred) {
+      groups.starred.push(conv);
+    } else if (isToday(date)) {
+      groups.today.push(conv);
+    } else if (isYesterday(date)) {
+      groups.yesterday.push(conv);
+    } else if (isThisWeek(date)) {
+      groups.thisWeek.push(conv);
+    } else {
+      groups.earlier.push(conv);
+    }
+  });
+
+  return groups;
+}
+
 export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -61,15 +107,27 @@ export function Sidebar() {
     fetchConversations,
     toggleStar,
     deleteConversation,
-    setCurrentConversation
+    setCurrentConversation,
+    renameConversation,
   } = useConversationStore();
   const { clearMessages } = useChatStore();
   const { clearPlan } = usePlanStore();
   const { openSearch } = useSearchStore();
+
   const [activeNav, setActiveNav] = useState("tasks");
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [expandedSections, setExpandedSections] = useState({
+    starred: true,
+    today: true,
+    yesterday: true,
+    thisWeek: false,
+    earlier: false,
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   // Fetch conversations when authenticated
   useEffect(() => {
@@ -78,10 +136,27 @@ export function Sidebar() {
     }
   }, [isAuthenticated, fetchConversations]);
 
+  // Group and filter conversations
+  const groupedConversations = useMemo(() => {
+    let filtered = conversations;
+
+    if (filter === "starred") {
+      filtered = conversations.filter((c) => c.starred);
+    } else if (filter === "recent") {
+      const weekAgo = subDays(new Date(), 7);
+      filtered = conversations.filter((c) => new Date(c.updatedAt) >= weekAgo);
+    }
+
+    return groupConversations(filtered);
+  }, [conversations, filter]);
+
+  const toggleSection = useCallback((section: keyof typeof expandedSections) => {
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  }, []);
+
   const handleNavClick = (navId: string) => {
     setActiveNav(navId);
     if (navId === "tasks" || navId === "home") {
-      // Start new task - clear current conversation and messages
       setCurrentConversation(null);
       clearMessages();
       clearPlan();
@@ -91,13 +166,11 @@ export function Sidebar() {
     } else if (navId === "settings") {
       router.push("/settings");
     } else if (navId === "history") {
-      // TODO: Implement history page
       router.push("/");
     }
   };
 
   const handleConversationClick = (convId: string) => {
-    console.log("Clicking conversation:", convId);
     setCurrentConversation(convId);
     router.push(`/task/${convId}`);
   };
@@ -114,6 +187,26 @@ export function Sidebar() {
     deleteConversation(convId);
   };
 
+  const handleStartEdit = (conv: Conversation, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingId(conv.id);
+    setEditTitle(conv.title);
+  };
+
+  const handleSaveEdit = (convId: string) => {
+    if (editTitle.trim() && renameConversation) {
+      renameConversation(convId, editTitle.trim());
+    }
+    setEditingId(null);
+    setEditTitle("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditTitle("");
+  };
+
   const formatTime = (dateStr: string) => {
     try {
       return formatDistanceToNow(new Date(dateStr), { addSuffix: true });
@@ -122,10 +215,160 @@ export function Sidebar() {
     }
   };
 
-  // Close user menu when sidebar collapses
   const handleToggleSidebar = () => {
     if (sidebarOpen) setUserMenuOpen(false);
     toggleSidebar();
+  };
+
+  // Conversation Group Component
+  const ConversationGroup = ({
+    title,
+    icon: Icon,
+    conversations,
+    sectionKey,
+    color = "text-grey-400",
+  }: {
+    title: string;
+    icon: React.ElementType;
+    conversations: Conversation[];
+    sectionKey: keyof typeof expandedSections;
+    color?: string;
+  }) => {
+    if (conversations.length === 0) return null;
+    const isExpanded = expandedSections[sectionKey];
+
+    return (
+      <div className="mb-2">
+        <button
+          onClick={() => toggleSection(sectionKey)}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-grey-400 hover:text-grey-600 transition-colors"
+        >
+          <Icon className={cn("h-3 w-3", color)} />
+          <span className="flex-1 text-left">{title}</span>
+          <span className="rounded-full bg-grey-100 px-1.5 py-0.5 text-[10px] font-medium text-grey-500">
+            {conversations.length}
+          </span>
+          <ChevronRight
+            className={cn(
+              "h-3 w-3 text-grey-400 transition-transform",
+              isExpanded && "rotate-90"
+            )}
+          />
+        </button>
+
+        {isExpanded && (
+          <div className="space-y-0.5 mt-1 animate-fade-in">
+            {conversations.map((conv) => (
+              <ConversationItem key={conv.id} conv={conv} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Single Conversation Item
+  const ConversationItem = ({ conv }: { conv: Conversation }) => {
+    const isHovered = hoveredTask === conv.id;
+    const isActive = pathname === `/task/${conv.id}` || currentConversationId === conv.id;
+    const isEditing = editingId === conv.id;
+
+    return (
+      <div
+        className="group relative"
+        onMouseEnter={() => setHoveredTask(conv.id)}
+        onMouseLeave={() => setHoveredTask(null)}
+      >
+        {isEditing ? (
+          // Edit mode
+          <div className="flex items-center gap-1 px-3 py-1.5">
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveEdit(conv.id);
+                if (e.key === "Escape") handleCancelEdit();
+              }}
+              autoFocus
+              className="flex-1 rounded-md border border-sage-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-400"
+            />
+            <button
+              onClick={() => handleSaveEdit(conv.id)}
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-sage-100 text-sage-600 hover:bg-sage-200 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleCancelEdit}
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-grey-100 text-grey-600 hover:bg-grey-200 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          // View mode
+          <button
+            onClick={() => handleConversationClick(conv.id)}
+            className={cn(
+              "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all",
+              isActive
+                ? "bg-sage-50 border-l-2 border-sage-400 text-grey-900"
+                : "hover:bg-grey-50 hover:translate-x-0.5"
+            )}
+          >
+            {conv.starred ? (
+              <Star className="h-3.5 w-3.5 flex-shrink-0 fill-sage-500 text-sage-500" />
+            ) : (
+              <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-grey-300" />
+            )}
+            <span
+              className={cn(
+                "flex-1 truncate text-sm",
+                isActive ? "font-medium text-grey-900" : "text-grey-600"
+              )}
+            >
+              {conv.title}
+            </span>
+            {!isHovered && (
+              <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
+            )}
+          </button>
+        )}
+
+        {/* Action buttons on hover */}
+        {isHovered && !isEditing && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 animate-fade-in bg-white rounded-md shadow-sm border border-grey-100 p-0.5">
+            <button
+              onClick={(e) => handleStartEdit(conv, e)}
+              className="flex h-6 w-6 items-center justify-center rounded text-grey-400 hover:bg-grey-100 hover:text-grey-600 transition-all"
+              title="Rename"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button
+              onClick={(e) => handleToggleStar(conv.id, e)}
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded transition-all",
+                conv.starred
+                  ? "text-sage-500 hover:bg-sage-100"
+                  : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
+              )}
+              title={conv.starred ? "Unstar" : "Star"}
+            >
+              <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
+            </button>
+            <button
+              onClick={(e) => handleDelete(conv.id, e)}
+              className="flex h-6 w-6 items-center justify-center rounded text-grey-400 hover:bg-grey-100 hover:text-grey-600 transition-all"
+              title="Delete"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const NavItem = ({ item }: { item: NavItem }) => {
@@ -147,7 +390,6 @@ export function Sidebar() {
               : "text-grey-600 hover:bg-grey-50 hover:text-grey-900"
           )}
         >
-          {/* Active indicator - only when expanded */}
           {isActive && sidebarOpen && (
             <div className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-sage-500" />
           )}
@@ -167,7 +409,6 @@ export function Sidebar() {
                 !isActive && "group-hover:scale-110"
               )}
             />
-            {/* Badge dot when collapsed */}
             {!sidebarOpen && item.badge && (
               <span className="absolute -right-1 -top-1 flex h-2 w-2 rounded-full bg-sage-500" />
             )}
@@ -182,7 +423,6 @@ export function Sidebar() {
             {item.label}
           </span>
 
-          {/* Badge or shortcut when expanded */}
           {sidebarOpen && item.badge && (
             <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-sage-100 px-1.5 text-xs font-semibold text-sage-700">
               {item.badge}
@@ -195,7 +435,6 @@ export function Sidebar() {
           )}
         </button>
 
-        {/* Tooltip when collapsed */}
         {!sidebarOpen && isHovered && (
           <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
             <div className="flex items-center gap-2 rounded-lg bg-grey-900 px-3 py-2 text-sm font-medium text-white shadow-xl">
@@ -223,13 +462,12 @@ export function Sidebar() {
       className={cn(
         "relative flex h-full flex-col overflow-hidden bg-white transition-all duration-300 ease-in-out",
         "border-r border-grey-200/60",
-        sidebarOpen ? "w-64" : "w-[72px]"
+        sidebarOpen ? "w-72" : "w-[72px]"
       )}
     >
-      {/* Subtle background gradient */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-sage-50/30 via-transparent to-transparent" />
 
-      {/* Scrollable Top Section */}
+      {/* Scrollable Content */}
       <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {/* Logo Section */}
         <div
@@ -238,205 +476,207 @@ export function Sidebar() {
             sidebarOpen ? "justify-start px-3" : "justify-center"
           )}
         >
-        <div className="group relative flex items-center">
-          <Image
-            src="/sage-logo.png"
-            alt="Sage"
-            width={sidebarOpen ? 220 : 52}
-            height={72}
-            className={cn(
-              "object-contain transition-all duration-300 group-hover:scale-105",
-              sidebarOpen ? "h-[72px] w-auto -ml-3" : "h-12 w-12"
-            )}
-          />
+          <div className="group relative flex items-center">
+            <Image
+              src="/sage-logo.png"
+              alt="Sage"
+              width={sidebarOpen ? 220 : 52}
+              height={72}
+              className={cn(
+                "object-contain transition-all duration-300 group-hover:scale-105",
+                sidebarOpen ? "h-[72px] w-auto -ml-3" : "h-12 w-12"
+              )}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* New Task Button */}
-      <div className={cn("relative", sidebarOpen ? "px-3 pb-2" : "px-2 pb-2")}>
-        <button
-          onClick={() => handleNavClick("tasks")}
-          onMouseEnter={() => !sidebarOpen && setHoveredItem("newtask")}
-          onMouseLeave={() => setHoveredItem(null)}
-          className={cn(
-            "group flex w-full items-center rounded-xl border-2 border-dashed border-grey-200 text-sm font-medium text-grey-500 transition-all duration-200",
-            "hover:border-sage-300 hover:bg-sage-50 hover:text-sage-700 active:scale-[0.98]",
-            sidebarOpen ? "gap-2 px-3 py-2.5" : "justify-center p-3"
-          )}
-        >
-          <Plus className={cn("transition-all group-hover:rotate-90", sidebarOpen ? "h-4 w-4" : "h-5 w-5")} />
-          <span
+        {/* New Task Button */}
+        <div className={cn("relative", sidebarOpen ? "px-3 pb-2" : "px-2 pb-2")}>
+          <button
+            onClick={() => handleNavClick("tasks")}
+            onMouseEnter={() => !sidebarOpen && setHoveredItem("newtask")}
+            onMouseLeave={() => setHoveredItem(null)}
             className={cn(
-              "flex-1 overflow-hidden whitespace-nowrap text-left transition-all duration-300",
-              sidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0"
+              "group flex w-full items-center rounded-xl bg-gradient-to-r from-sage-500 to-sage-600 text-sm font-medium text-white shadow-md shadow-sage-500/25 transition-all duration-200",
+              "hover:shadow-lg hover:shadow-sage-500/30 active:scale-[0.98]",
+              sidebarOpen ? "gap-2 px-3 py-2.5" : "justify-center p-3"
             )}
           >
-            New Task
-          </span>
-          {sidebarOpen && (
-            <kbd className="flex items-center gap-0.5 rounded-md bg-grey-100 px-1.5 py-0.5 font-mono text-[10px] text-grey-400 transition-colors group-hover:bg-sage-100 group-hover:text-sage-600">
-              <Command className="h-2.5 w-2.5" />N
-            </kbd>
-          )}
-        </button>
-        {/* Tooltip when collapsed */}
-        {!sidebarOpen && hoveredItem === "newtask" && (
-          <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
-            <div className="flex items-center gap-2 rounded-lg bg-grey-900 px-3 py-2 text-sm font-medium text-white shadow-xl">
+            <Plus className={cn("transition-all group-hover:rotate-90", sidebarOpen ? "h-4 w-4" : "h-5 w-5")} />
+            <span
+              className={cn(
+                "flex-1 overflow-hidden whitespace-nowrap text-left transition-all duration-300",
+                sidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0"
+              )}
+            >
               New Task
-              <kbd className="rounded bg-grey-700 px-1.5 py-0.5 font-mono text-[10px] text-grey-300">
-                ⌘N
+            </span>
+            {sidebarOpen && (
+              <kbd className="flex items-center gap-0.5 rounded-md bg-white/20 px-1.5 py-0.5 font-mono text-[10px] text-white/80">
+                <Command className="h-2.5 w-2.5" />N
               </kbd>
-              <div className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 bg-grey-900" />
+            )}
+          </button>
+          {!sidebarOpen && hoveredItem === "newtask" && (
+            <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
+              <div className="flex items-center gap-2 rounded-lg bg-grey-900 px-3 py-2 text-sm font-medium text-white shadow-xl">
+                New Task
+                <kbd className="rounded bg-grey-700 px-1.5 py-0.5 font-mono text-[10px] text-grey-300">
+                  ⌘N
+                </kbd>
+                <div className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 bg-grey-900" />
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Search Bar */}
-      <div className={cn("relative", sidebarOpen ? "px-3 pb-3" : "px-2 pb-2")}>
-        <button
-          onClick={openSearch}
-          onMouseEnter={() => !sidebarOpen && setHoveredItem("search")}
-          onMouseLeave={() => setHoveredItem(null)}
-          className={cn(
-            "group flex w-full items-center rounded-xl bg-grey-50 text-sm text-grey-400 transition-all duration-200",
-            "hover:bg-grey-100 hover:text-grey-600 active:scale-[0.98]",
-            sidebarOpen ? "gap-2 px-3 py-2" : "justify-center p-3"
           )}
-        >
-          <Search className={cn("transition-all", sidebarOpen ? "h-4 w-4" : "h-5 w-5")} />
-          <span
+        </div>
+
+        {/* Search Bar */}
+        <div className={cn("relative", sidebarOpen ? "px-3 pb-3" : "px-2 pb-2")}>
+          <button
+            onClick={openSearch}
+            onMouseEnter={() => !sidebarOpen && setHoveredItem("search")}
+            onMouseLeave={() => setHoveredItem(null)}
             className={cn(
-              "flex-1 overflow-hidden whitespace-nowrap text-left transition-all duration-300",
-              sidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0"
+              "group flex w-full items-center rounded-xl bg-grey-50 text-sm text-grey-400 transition-all duration-200",
+              "hover:bg-grey-100 hover:text-grey-600 active:scale-[0.98]",
+              sidebarOpen ? "gap-2 px-3 py-2" : "justify-center p-3"
             )}
           >
-            Search...
-          </span>
-          {sidebarOpen && (
-            <kbd className="flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] text-grey-400 shadow-sm ring-1 ring-grey-200">
-              <Command className="h-2.5 w-2.5" />K
-            </kbd>
-          )}
-        </button>
-        {/* Tooltip when collapsed */}
-        {!sidebarOpen && hoveredItem === "search" && (
-          <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
-            <div className="flex items-center gap-2 rounded-lg bg-grey-900 px-3 py-2 text-sm font-medium text-white shadow-xl">
-              Search
-              <kbd className="rounded bg-grey-700 px-1.5 py-0.5 font-mono text-[10px] text-grey-300">
-                ⌘K
+            <Search className={cn("transition-all", sidebarOpen ? "h-4 w-4" : "h-5 w-5")} />
+            <span
+              className={cn(
+                "flex-1 overflow-hidden whitespace-nowrap text-left transition-all duration-300",
+                sidebarOpen ? "w-auto opacity-100" : "w-0 opacity-0"
+              )}
+            >
+              Search tasks...
+            </span>
+            {sidebarOpen && (
+              <kbd className="flex items-center gap-0.5 rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] text-grey-400 shadow-sm ring-1 ring-grey-200">
+                <Command className="h-2.5 w-2.5" />K
               </kbd>
-              <div className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 bg-grey-900" />
+            )}
+          </button>
+          {!sidebarOpen && hoveredItem === "search" && (
+            <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
+              <div className="flex items-center gap-2 rounded-lg bg-grey-900 px-3 py-2 text-sm font-medium text-white shadow-xl">
+                Search
+                <kbd className="rounded bg-grey-700 px-1.5 py-0.5 font-mono text-[10px] text-grey-300">
+                  ⌘K
+                </kbd>
+                <div className="absolute -left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 bg-grey-900" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filter Tabs - Only when expanded */}
+        {sidebarOpen && conversations.length > 0 && (
+          <div className="px-3 pb-2">
+            <div className="flex items-center gap-1 rounded-lg bg-grey-50 p-1">
+              {[
+                { id: "all" as FilterType, label: "All", icon: FolderOpen },
+                { id: "starred" as FilterType, label: "Starred", icon: Star },
+                { id: "recent" as FilterType, label: "Recent", icon: Clock },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setFilter(tab.id)}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-all",
+                    filter === tab.id
+                      ? "bg-white text-sage-700 shadow-sm"
+                      : "text-grey-500 hover:text-grey-700"
+                  )}
+                >
+                  <tab.icon className="h-3 w-3" />
+                  {tab.label}
+                </button>
+              ))}
             </div>
           </div>
         )}
-      </div>
 
-      {/* Recent Conversations - Only when expanded */}
-      {sidebarOpen && conversations.length > 0 && (
-        <div className="relative z-10 px-3 pb-2">
-          <div className="mb-2 flex items-center justify-between px-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-grey-400">
-              Recent
+        {/* Conversations - Grouped by Date */}
+        {sidebarOpen && conversations.length > 0 && (
+          <div className="relative z-10 px-3 pb-2 flex-1">
+            <ConversationGroup
+              title="Starred"
+              icon={Star}
+              conversations={groupedConversations.starred}
+              sectionKey="starred"
+              color="text-sage-500"
+            />
+            <ConversationGroup
+              title="Today"
+              icon={Clock}
+              conversations={groupedConversations.today}
+              sectionKey="today"
+              color="text-sage-500"
+            />
+            <ConversationGroup
+              title="Yesterday"
+              icon={Calendar}
+              conversations={groupedConversations.yesterday}
+              sectionKey="yesterday"
+            />
+            <ConversationGroup
+              title="This Week"
+              icon={Calendar}
+              conversations={groupedConversations.thisWeek}
+              sectionKey="thisWeek"
+            />
+            <ConversationGroup
+              title="Earlier"
+              icon={Archive}
+              conversations={groupedConversations.earlier}
+              sectionKey="earlier"
+            />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {sidebarOpen && conversations.length === 0 && (
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sage-100 mb-3">
+              <MessageSquare className="h-6 w-6 text-sage-600" />
+            </div>
+            <h3 className="text-sm font-semibold text-grey-900 mb-1">No tasks yet</h3>
+            <p className="text-xs text-grey-500 mb-4">
+              Start a new task to begin your research journey
             </p>
+            <button
+              onClick={() => handleNavClick("tasks")}
+              className="flex items-center gap-1.5 rounded-lg bg-sage-50 px-3 py-1.5 text-xs font-medium text-sage-700 hover:bg-sage-100 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Create your first task
+            </button>
           </div>
-          <div className="space-y-0.5">
-            {conversations.slice(0, 5).map((conv) => {
-              const isHovered = hoveredTask === conv.id;
-              const isActive = pathname === `/task/${conv.id}` || currentConversationId === conv.id;
-              return (
-                <div
-                  key={conv.id}
-                  className="group relative"
-                  onMouseEnter={() => setHoveredTask(conv.id)}
-                  onMouseLeave={() => setHoveredTask(null)}
-                >
-                  {/* Main clickable area */}
-                  <button
-                    onClick={() => handleConversationClick(conv.id)}
-                    className={cn(
-                      "flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left transition-all hover:bg-grey-50 hover:translate-x-0.5",
-                      isActive && "bg-sage-50 border-l-2 border-sage-400"
-                    )}
-                  >
-                    {conv.starred ? (
-                      <Star className="h-3.5 w-3.5 flex-shrink-0 fill-sage-500 text-sage-500" />
-                    ) : (
-                      <MessageSquare className="h-3.5 w-3.5 flex-shrink-0 text-grey-300" />
-                    )}
-                    <span className={cn(
-                      "flex-1 truncate text-sm",
-                      conv.starred || isActive ? "text-grey-800" : "text-grey-600"
-                    )}>
-                      {conv.title}
-                    </span>
-                    {!isHovered && (
-                      <span className="text-[10px] text-grey-400">{formatTime(conv.updatedAt)}</span>
-                    )}
-                  </button>
-
-                  {/* Action buttons - outside the main button */}
-                  {isHovered && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 animate-fade-in">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleStar(conv.id, e);
-                        }}
-                        className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded-md transition-all",
-                          conv.starred
-                            ? "text-sage-500 hover:bg-sage-100"
-                            : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
-                        )}
-                      >
-                        <Star className={cn("h-3 w-3", conv.starred && "fill-current")} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(conv.id, e);
-                        }}
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-grey-400 transition-all hover:bg-grey-100 hover:text-grey-600"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        )}
 
         {/* Main Navigation */}
-        <nav className={cn("relative py-2", sidebarOpen ? "px-3" : "px-2")}>
-        {/* Section Label - Only when expanded */}
-        {sidebarOpen && (
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-grey-400">
-            Main
-          </p>
-        )}
-        <div className="space-y-1">
-          {mainNavItems.map((item) => (
-            <NavItem key={item.id} item={item} />
-          ))}
-        </div>
+        <nav className={cn("relative py-2 mt-auto", sidebarOpen ? "px-3" : "px-2")}>
+          {sidebarOpen && (
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-grey-400">
+              Navigation
+            </p>
+          )}
+          <div className="space-y-1">
+            {mainNavItems.map((item) => (
+              <NavItem key={item.id} item={item} />
+            ))}
+          </div>
 
-        {/* Divider */}
-        <div className={cn("my-4", sidebarOpen ? "border-t border-grey-100" : "flex justify-center")}>
-          {!sidebarOpen && <div className="h-px w-8 bg-grey-200" />}
-        </div>
+          <div className={cn("my-4", sidebarOpen ? "border-t border-grey-100" : "flex justify-center")}>
+            {!sidebarOpen && <div className="h-px w-8 bg-grey-200" />}
+          </div>
 
-        {/* Secondary Section Label */}
-        {sidebarOpen && (
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-grey-400">
-            More
-          </p>
-        )}
+          {sidebarOpen && (
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-grey-400">
+              More
+            </p>
+          )}
           <div className="space-y-1">
             {secondaryNavItems.map((item) => (
               <NavItem key={item.id} item={item} />
@@ -454,7 +694,6 @@ export function Sidebar() {
             sidebarOpen ? "p-3" : "p-2"
           )}
         >
-          {/* Decorative glow */}
           <div className="absolute -right-6 -top-6 h-16 w-16 rounded-full bg-sage-200/40 blur-2xl transition-all duration-500 group-hover:bg-sage-300/50" />
 
           <div
@@ -467,7 +706,7 @@ export function Sidebar() {
               <div
                 className={cn(
                   "flex items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-sage-100",
-                  sidebarOpen ? "h-10 w-10" : "h-10 w-10"
+                  "h-10 w-10"
                 )}
               >
                 <Sparkles className="h-5 w-5 text-sage-600" />
@@ -492,7 +731,6 @@ export function Sidebar() {
             </div>
           </div>
 
-          {/* Usage Stats - Only when expanded */}
           {sidebarOpen && (
             <div className="relative mt-3 pt-3 border-t border-sage-200/50">
               <div className="flex items-center justify-between text-xs">
@@ -553,7 +791,6 @@ export function Sidebar() {
           </div>
         </button>
 
-        {/* Tooltip when collapsed */}
         {!sidebarOpen && hoveredItem === "user" && (
           <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
             <div className="rounded-lg bg-grey-900 px-3 py-2 shadow-xl">
@@ -564,10 +801,8 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* User Dropdown Menu */}
         {sidebarOpen && userMenuOpen && (
           <div className="mt-2 animate-fade-in rounded-xl border border-grey-100 bg-white p-1 shadow-lg">
-            {/* Upgrade prompt */}
             <div className="mx-1 mb-1 rounded-lg bg-gradient-to-r from-sage-50 to-sage-100/50 p-2.5">
               <div className="flex items-center gap-2">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white shadow-sm">
@@ -646,7 +881,6 @@ export function Sidebar() {
           )}
         </button>
 
-        {/* Tooltip when collapsed */}
         {!sidebarOpen && hoveredItem === "collapse" && (
           <div className="absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 animate-fade-in">
             <div className="flex items-center gap-2 rounded-lg bg-grey-900 px-3 py-2 text-sm font-medium text-white shadow-xl">
