@@ -63,6 +63,41 @@ export interface QualityMetrics {
   avgScore: number;
 }
 
+export interface ReasoningEntry {
+  id: string;
+  observation: string;
+  analysis: string;
+  hypothesis?: string;
+  nextAction: string;
+  alternatives?: string[];
+  timestamp: Date;
+  stepIndex: number;
+}
+
+export interface StepTiming {
+  stepIndex: number;
+  startTime: Date;
+  endTime?: Date;
+  duration?: number; // ms
+  iterations: number;
+}
+
+export interface ValidationResult {
+  claim: string;
+  confidence: 'high' | 'medium' | 'low';
+  isValid: boolean;
+  sources: string[];
+  timestamp: Date;
+}
+
+export interface PlanModification {
+  action: 'add_step' | 'remove_step' | 'modify_current';
+  reason: string;
+  newContent?: string;
+  stepIndex?: number;
+  timestamp: Date;
+}
+
 // Execution status type
 export type ExecutionStatus = "idle" | "running" | "paused" | "cancelled" | "completed" | "error";
 
@@ -94,6 +129,23 @@ interface AgentState {
   qualityScore: "excellent" | "good" | "needs_improvement" | null;
   totalIterations: number;
 
+  // NEW: Enhanced reasoning tracking
+  reasoningHistory: ReasoningEntry[];
+  reasoningExpanded: boolean;
+
+  // NEW: Step timings for progress estimation
+  stepTimings: Map<number, StepTiming>;
+  estimatedCompletion: Date | null;
+
+  // NEW: Validation tracking
+  validationResults: ValidationResult[];
+
+  // NEW: Plan modifications
+  pendingModifications: PlanModification[];
+
+  // NEW: User-prioritized URLs (from interactive results)
+  userPrioritizedUrls: string[];
+
   // Actions
   setExecuting: (executing: boolean) => void;
   setExecutionStatus: (status: ExecutionStatus) => void;
@@ -124,6 +176,29 @@ interface AgentState {
   incrementIterations: () => void;
   clearActions: () => void;
   reset: () => void;
+
+  // NEW: Enhanced reasoning actions
+  addReasoningEntry: (entry: Omit<ReasoningEntry, "id" | "timestamp" | "stepIndex">) => void;
+  setReasoningExpanded: (expanded: boolean) => void;
+  toggleReasoningExpanded: () => void;
+
+  // NEW: Step timing actions
+  startStepTiming: (stepIndex: number) => void;
+  endStepTiming: (stepIndex: number) => void;
+  updateStepIterations: (stepIndex: number) => void;
+  setEstimatedCompletion: (date: Date | null) => void;
+
+  // NEW: Validation actions
+  addValidationResult: (result: Omit<ValidationResult, "timestamp">) => void;
+
+  // NEW: Plan modification actions
+  addPendingModification: (mod: Omit<PlanModification, "timestamp">) => void;
+  clearPendingModifications: () => void;
+
+  // NEW: User-prioritized URL actions
+  addPrioritizedUrl: (url: string) => void;
+  removePrioritizedUrl: (url: string) => void;
+  clearPrioritizedUrls: () => void;
 }
 
 const initialBrowserState: BrowserState = {
@@ -154,6 +229,23 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   qualityMetrics: null,
   qualityScore: null,
   totalIterations: 0,
+
+  // NEW: Enhanced reasoning tracking
+  reasoningHistory: [],
+  reasoningExpanded: false,
+
+  // NEW: Step timings
+  stepTimings: new Map(),
+  estimatedCompletion: null,
+
+  // NEW: Validation results
+  validationResults: [],
+
+  // NEW: Plan modifications
+  pendingModifications: [],
+
+  // NEW: User-prioritized URLs
+  userPrioritizedUrls: [],
 
   // Execution control
   setExecuting: (executing) => set({
@@ -336,6 +428,110 @@ export const useAgentStore = create<AgentState>((set, get) => ({
 
   clearActions: () => set({ actions: [] }),
 
+  // NEW: Enhanced reasoning actions
+  addReasoningEntry: (entry) => {
+    const { currentStepIndex, reasoningHistory } = get();
+    set({
+      reasoningHistory: [
+        ...reasoningHistory,
+        {
+          ...entry,
+          id: nanoid(),
+          timestamp: new Date(),
+          stepIndex: currentStepIndex,
+        },
+      ],
+    });
+  },
+
+  setReasoningExpanded: (expanded) => set({ reasoningExpanded: expanded }),
+
+  toggleReasoningExpanded: () => set((state) => ({ reasoningExpanded: !state.reasoningExpanded })),
+
+  // NEW: Step timing actions
+  startStepTiming: (stepIndex) => {
+    set((state) => {
+      const newTimings = new Map(state.stepTimings);
+      newTimings.set(stepIndex, {
+        stepIndex,
+        startTime: new Date(),
+        iterations: 0,
+      });
+      return { stepTimings: newTimings };
+    });
+  },
+
+  endStepTiming: (stepIndex) => {
+    set((state) => {
+      const newTimings = new Map(state.stepTimings);
+      const existing = newTimings.get(stepIndex);
+      if (existing) {
+        const endTime = new Date();
+        newTimings.set(stepIndex, {
+          ...existing,
+          endTime,
+          duration: endTime.getTime() - existing.startTime.getTime(),
+        });
+      }
+      return { stepTimings: newTimings };
+    });
+  },
+
+  updateStepIterations: (stepIndex) => {
+    set((state) => {
+      const newTimings = new Map(state.stepTimings);
+      const existing = newTimings.get(stepIndex);
+      if (existing) {
+        newTimings.set(stepIndex, {
+          ...existing,
+          iterations: existing.iterations + 1,
+        });
+      }
+      return { stepTimings: newTimings };
+    });
+  },
+
+  setEstimatedCompletion: (date) => set({ estimatedCompletion: date }),
+
+  // NEW: Validation actions
+  addValidationResult: (result) => {
+    set((state) => ({
+      validationResults: [
+        ...state.validationResults,
+        { ...result, timestamp: new Date() },
+      ],
+    }));
+  },
+
+  // NEW: Plan modification actions
+  addPendingModification: (mod) => {
+    set((state) => ({
+      pendingModifications: [
+        ...state.pendingModifications,
+        { ...mod, timestamp: new Date() },
+      ],
+    }));
+  },
+
+  clearPendingModifications: () => set({ pendingModifications: [] }),
+
+  // NEW: User-prioritized URL actions
+  addPrioritizedUrl: (url) => {
+    set((state) => ({
+      userPrioritizedUrls: state.userPrioritizedUrls.includes(url)
+        ? state.userPrioritizedUrls
+        : [...state.userPrioritizedUrls, url],
+    }));
+  },
+
+  removePrioritizedUrl: (url) => {
+    set((state) => ({
+      userPrioritizedUrls: state.userPrioritizedUrls.filter((u) => u !== url),
+    }));
+  },
+
+  clearPrioritizedUrls: () => set({ userPrioritizedUrls: [] }),
+
   reset: () =>
     set({
       isExecuting: false,
@@ -355,5 +551,13 @@ export const useAgentStore = create<AgentState>((set, get) => ({
       qualityMetrics: null,
       qualityScore: null,
       totalIterations: 0,
+      // NEW: Reset new state
+      reasoningHistory: [],
+      reasoningExpanded: false,
+      stepTimings: new Map(),
+      estimatedCompletion: null,
+      validationResults: [],
+      pendingModifications: [],
+      userPrioritizedUrls: [],
     }),
 }));

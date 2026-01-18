@@ -25,13 +25,18 @@ import {
   Brain,
   Check,
   X,
+  Timer,
+  TrendingUp,
+  Pencil,
 } from "lucide-react";
 import { Confetti } from "@/components/ui";
+import { ReasoningPanel } from "@/components/workspace/ReasoningPanel";
 
 export function PlanPanel() {
   const {
     currentPlan,
     isGenerating,
+    pendingModifications,
     updateStepStatus,
     clearPlan,
     addStep,
@@ -43,6 +48,10 @@ export function PlanPanel() {
     clearStepError,
     resetAllSteps,
     skipRemainingSteps,
+    addPendingModification,
+    approveModification,
+    rejectModification,
+    clearPendingModifications,
   } = usePlanStore();
 
   const {
@@ -51,6 +60,9 @@ export function PlanPanel() {
     pauseRequested,
     cancelRequested,
     currentReasoning,
+    stepTimings,
+    estimatedCompletion,
+    addReasoningEntry,
     setExecuting,
     setExecutionStatus,
     pauseExecution,
@@ -62,6 +74,10 @@ export function PlanPanel() {
     appendFindings,
     setLatestSearchResults,
     setBrowserState,
+    startStepTiming,
+    endStepTiming,
+    updateStepIterations,
+    setEstimatedCompletion,
     reset,
   } = useAgentStore();
 
@@ -187,6 +203,8 @@ export function PlanPanel() {
                     label: event.data.label,
                     status: event.data.status,
                   });
+                  // Track iterations
+                  updateStepIterations(stepIndex);
                 } else if (event.type === "searchResults") {
                   setLatestSearchResults(event.data);
                 } else if (event.type === "browserState") {
@@ -194,7 +212,28 @@ export function PlanPanel() {
                 } else if (event.type === "findings") {
                   appendFindings(event.data);
                 } else if (event.type === "reasoning") {
-                  useAgentStore.getState().setCurrentReasoning(event.data);
+                  const data = event.data;
+                  useAgentStore.getState().setCurrentReasoning(data.nextAction || data);
+                  // Store full reasoning entry if structured
+                  if (data.observation || data.analysis) {
+                    addReasoningEntry({
+                      observation: data.observation || "",
+                      analysis: data.analysis || "",
+                      hypothesis: data.hypothesis,
+                      nextAction: data.nextAction || "",
+                      alternatives: data.alternatives,
+                    });
+                  }
+                } else if (event.type === "planModification") {
+                  // Handle plan modification from agent
+                  addPendingModification({
+                    action: event.data.action,
+                    reason: event.data.reason,
+                    newContent: event.data.newContent,
+                    stepIndex: event.data.stepIndex,
+                  });
+                } else if (event.type === "completionStatus") {
+                  // Could update UI with completion progress
                 } else if (event.type === "done") {
                   resolve(true);
                   return;
@@ -332,8 +371,19 @@ export function PlanPanel() {
 
         setCurrentStepIndex(i);
         updateStepStatus(step.id, "in_progress");
+        startStepTiming(i);
 
         const success = await executeStep(i, step.content, currentPlan.title);
+        endStepTiming(i);
+
+        // Calculate estimated completion based on average step time
+        const completedTimings = Array.from(stepTimings.values()).filter(t => t.duration);
+        if (completedTimings.length > 0) {
+          const avgTime = completedTimings.reduce((sum, t) => sum + (t.duration || 0), 0) / completedTimings.length;
+          const remainingSteps = currentPlan.steps.length - i - 1;
+          const estimatedMs = avgTime * remainingSteps;
+          setEstimatedCompletion(new Date(Date.now() + estimatedMs));
+        }
 
         // Check again for cancellation after step completes
         if (useAgentStore.getState().cancelRequested) {
@@ -517,11 +567,21 @@ export function PlanPanel() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Elapsed time during execution */}
+          {/* Elapsed time and ETA during execution */}
           {isExecuting && (
-            <div className="flex items-center gap-1.5 text-xs text-grey-500">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="font-mono">{formatTime(elapsedTime)}</span>
+            <div className="flex items-center gap-3 text-xs text-grey-500">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span className="font-mono">{formatTime(elapsedTime)}</span>
+              </div>
+              {estimatedCompletion && (
+                <div className="flex items-center gap-1.5 text-sage-600">
+                  <Timer className="h-3.5 w-3.5" />
+                  <span className="font-mono">
+                    ~{formatTime(Math.max(0, Math.floor((estimatedCompletion.getTime() - Date.now()) / 1000)))}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -613,11 +673,45 @@ export function PlanPanel() {
         </div>
       </div>
 
-      {/* Current reasoning indicator */}
-      {isExecuting && currentReasoning && (
-        <div className="flex items-center gap-2 border-b border-grey-100 bg-sage-50/50 px-6 py-2">
-          <Brain className="h-4 w-4 text-sage-600 flex-shrink-0" />
-          <span className="text-xs text-sage-700 truncate">{currentReasoning}</span>
+      {/* Enhanced reasoning panel */}
+      {isExecuting && <ReasoningPanel />}
+
+      {/* Pending plan modifications */}
+      {pendingModifications.filter(m => m.status === "pending").length > 0 && (
+        <div className="border-b border-sage-200 bg-sage-50 px-6 py-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Pencil className="h-4 w-4 text-sage-600" />
+            <span className="text-sm font-medium text-sage-700">Plan Modifications Pending</span>
+          </div>
+          <div className="space-y-2">
+            {pendingModifications.filter(m => m.status === "pending").map((mod) => (
+              <div key={mod.id} className="flex items-start gap-3 p-2 bg-white rounded-lg border border-sage-200">
+                <div className="flex-1">
+                  <p className="text-xs text-grey-700">
+                    <span className="font-medium capitalize">{mod.action.replace(/_/g, " ")}</span>
+                    {mod.newContent && `: "${mod.newContent.substring(0, 50)}${mod.newContent.length > 50 ? "..." : ""}"`}
+                  </p>
+                  <p className="text-xs text-grey-500 mt-0.5">{mod.reason}</p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => approveModification(mod.id)}
+                    className="p-1 rounded hover:bg-sage-100 text-sage-600"
+                    title="Approve"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => rejectModification(mod.id)}
+                    className="p-1 rounded hover:bg-grey-100 text-grey-500"
+                    title="Reject"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

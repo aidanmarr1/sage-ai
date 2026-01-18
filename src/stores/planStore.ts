@@ -21,9 +21,20 @@ export interface Plan {
   createdAt: Date;
 }
 
+export interface PlanModificationRequest {
+  id: string;
+  action: "add_step" | "remove_step" | "modify_current";
+  reason: string;
+  newContent?: string;
+  stepIndex?: number;
+  timestamp: Date;
+  status: "pending" | "approved" | "rejected";
+}
+
 interface PlanState {
   currentPlan: Plan | null;
   isGenerating: boolean;
+  pendingModifications: PlanModificationRequest[];
 
   // Basic actions
   setPlan: (plan: Plan | null) => void;
@@ -44,11 +55,19 @@ interface PlanState {
   // Bulk actions
   resetAllSteps: () => void;
   skipRemainingSteps: () => void;
+
+  // Plan modification actions (from agent)
+  addPendingModification: (mod: Omit<PlanModificationRequest, "id" | "timestamp" | "status">) => void;
+  approveModification: (modId: string) => void;
+  rejectModification: (modId: string) => void;
+  clearPendingModifications: () => void;
+  applyModification: (mod: PlanModificationRequest) => void;
 }
 
 export const usePlanStore = create<PlanState>((set, get) => ({
   currentPlan: null,
   isGenerating: false,
+  pendingModifications: [],
 
   setPlan: (plan) => set({ currentPlan: plan }),
 
@@ -232,5 +251,108 @@ export const usePlanStore = create<PlanState>((set, get) => ({
           ),
         },
       };
+    }),
+
+  // Add a pending modification from the agent
+  addPendingModification: (mod) =>
+    set((state) => ({
+      pendingModifications: [
+        ...state.pendingModifications,
+        {
+          ...mod,
+          id: nanoid(),
+          timestamp: new Date(),
+          status: "pending" as const,
+        },
+      ],
+    })),
+
+  // Approve a modification and apply it
+  approveModification: (modId) => {
+    const state = get();
+    const mod = state.pendingModifications.find((m) => m.id === modId);
+    if (!mod) return;
+
+    // Apply the modification
+    get().applyModification(mod);
+
+    // Update status
+    set((s) => ({
+      pendingModifications: s.pendingModifications.map((m) =>
+        m.id === modId ? { ...m, status: "approved" as const } : m
+      ),
+    }));
+  },
+
+  // Reject a modification
+  rejectModification: (modId) =>
+    set((state) => ({
+      pendingModifications: state.pendingModifications.map((m) =>
+        m.id === modId ? { ...m, status: "rejected" as const } : m
+      ),
+    })),
+
+  // Clear all pending modifications
+  clearPendingModifications: () => set({ pendingModifications: [] }),
+
+  // Apply a modification to the plan
+  applyModification: (mod) =>
+    set((state) => {
+      if (!state.currentPlan) return state;
+
+      const { action, newContent, stepIndex } = mod;
+
+      switch (action) {
+        case "add_step": {
+          if (!newContent) return state;
+          const newStep: PlanStep = {
+            id: nanoid(),
+            content: newContent,
+            status: "pending",
+            isOptional: false,
+            isEditing: false,
+          };
+
+          // Add after the current step index if provided
+          const insertIndex = stepIndex !== undefined ? stepIndex + 1 : state.currentPlan.steps.length;
+          const newSteps = [
+            ...state.currentPlan.steps.slice(0, insertIndex),
+            newStep,
+            ...state.currentPlan.steps.slice(insertIndex),
+          ];
+
+          return {
+            currentPlan: {
+              ...state.currentPlan,
+              steps: newSteps,
+            },
+          };
+        }
+
+        case "remove_step": {
+          if (stepIndex === undefined) return state;
+          return {
+            currentPlan: {
+              ...state.currentPlan,
+              steps: state.currentPlan.steps.filter((_, i) => i !== stepIndex),
+            },
+          };
+        }
+
+        case "modify_current": {
+          if (!newContent || stepIndex === undefined) return state;
+          return {
+            currentPlan: {
+              ...state.currentPlan,
+              steps: state.currentPlan.steps.map((step, i) =>
+                i === stepIndex ? { ...step, content: newContent } : step
+              ),
+            },
+          };
+        }
+
+        default:
+          return state;
+      }
     }),
 }));

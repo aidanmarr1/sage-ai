@@ -4,6 +4,35 @@ import { getSourceAuthority, type SourceAuthority } from "@/lib/source-quality";
 import Browserbase from "@browserbasehq/sdk";
 import { chromium, type Browser, type Page } from "playwright-core";
 
+// Import new intelligence systems
+import {
+  withRetry,
+  classifyError,
+  generateErrorFeedback,
+  ErrorTracker,
+  type ErrorInfo,
+} from "@/lib/error-recovery";
+import {
+  ResearchMemory,
+  getResearchMemory,
+  resetResearchMemory,
+} from "@/lib/research-memory";
+import {
+  selectTool,
+  toApiToolChoice,
+  generateToolGuidance,
+  detectPhase,
+  type ResearchContext,
+  type ToolUsagePattern,
+} from "@/lib/tool-selection";
+import {
+  deriveCompletionCriteria,
+  checkCompletion,
+  generateCompletionFeedback,
+  shouldContinue,
+  type ResearchProgress,
+} from "@/lib/completion-detection";
+
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
@@ -418,36 +447,47 @@ interface ChatMessage {
 }
 
 // ============================================================================
-// SMART TOOL SELECTION
+// SMART TOOL SELECTION (Enhanced with new system)
 // ============================================================================
 
-function determineToolChoice(
+function buildResearchContext(
   iteration: number,
-  previousTools: string[],
+  maxIterations: number,
   hasFindings: boolean,
-  maxIterations: number
+  findingsLength: number,
+  toolHistory: ToolUsagePattern[],
+  stepContent: string,
+  memory: ResearchMemory,
+  qualityMetrics?: {
+    sourceDiversity?: number;
+    factVerification?: number;
+    completeness?: number;
+  }
+): ResearchContext {
+  const stats = memory.getStats();
+  const highAuthSources = memory.getHighAuthoritySources();
+
+  return {
+    iteration,
+    maxIterations,
+    hasFindings,
+    findingsLength,
+    toolHistory,
+    sourcesCount: stats.uniqueUrls,
+    highAuthoritySources: highAuthSources.length,
+    validatedClaimsCount: stats.validatedClaimsCount,
+    searchesPerformed: stats.totalQueries,
+    pagesVisited: stats.pageCacheSize,
+    stepContent,
+    qualityMetrics,
+  };
+}
+
+function determineToolChoice(
+  context: ResearchContext
 ): "auto" | "required" | { type: "function"; function: { name: string } } {
-  // First iteration: always require reasoning
-  if (iteration === 1) {
-    return { type: "function", function: { name: "reason" } };
-  }
-
-  // Second iteration: encourage search if no search yet
-  if (iteration === 2 && !previousTools.some(t => t.includes("search"))) {
-    return "required"; // Require some tool, likely search
-  }
-
-  // Near end without findings: require write_findings
-  if (iteration >= maxIterations - 2 && !hasFindings) {
-    return { type: "function", function: { name: "write_findings" } };
-  }
-
-  // Last iteration: must write or complete
-  if (iteration === maxIterations - 1 && !hasFindings) {
-    return { type: "function", function: { name: "write_findings" } };
-  }
-
-  return "auto";
+  const suggestion = selectTool(context);
+  return toApiToolChoice(suggestion);
 }
 
 // ============================================================================
@@ -872,6 +912,15 @@ export async function POST(request: NextRequest) {
   // Dynamic iteration limit based on step complexity
   const maxIterations = getMaxIterations(step);
 
+  // Get or reset research memory for new task
+  const memory = stepIndex === 0 ? (resetResearchMemory(), getResearchMemory()) : getResearchMemory();
+
+  // Derive completion criteria from step content
+  const completionCriteria = deriveCompletionCriteria(step);
+
+  // Error tracker for adaptive behavior
+  const errorTracker = new ErrorTracker();
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -883,6 +932,8 @@ export async function POST(request: NextRequest) {
       let latestSearchResults: SearchResult[] = [];
       let currentReasoning = "";
       const usedTools: string[] = [];
+      const toolHistory: ToolUsagePattern[] = [];
+      let lastQualityMetrics: { sourceDiversity?: number; factVerification?: number; completeness?: number } | undefined;
 
       try {
         sendEvent("action", {
@@ -928,8 +979,50 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
         while (continueLoop && iterations < maxIterations) {
           iterations++;
 
+          // Build research context for smart tool selection
+          const researchContext = buildResearchContext(
+            iterations,
+            maxIterations,
+            hasWrittenFindings,
+            newFindingsContent.length,
+            toolHistory,
+            step,
+            memory,
+            lastQualityMetrics
+          );
+
           // Smart tool selection based on context
-          const toolChoice = determineToolChoice(iterations, usedTools, hasWrittenFindings, maxIterations);
+          const toolChoice = determineToolChoice(researchContext);
+
+          // Generate tool guidance for the prompt if needed
+          const toolGuidance = generateToolGuidance(selectTool(researchContext));
+
+          // Check if we should complete based on quality
+          const progress: ResearchProgress = {
+            sourcesCount: memory.getStats().uniqueUrls,
+            highAuthoritySources: memory.getHighAuthoritySources().length,
+            validatedClaimsCount: memory.getStats().validatedClaimsCount,
+            findingsLength: newFindingsContent.length,
+            qualityMetrics: lastQualityMetrics ? {
+              sourceDiversity: lastQualityMetrics.sourceDiversity || 3,
+              factVerification: lastQualityMetrics.factVerification || 3,
+              completeness: lastQualityMetrics.completeness || 3,
+              actionability: 3,
+            } : undefined,
+            hasWrittenFindings,
+            hasSelfEvaluated: usedTools.includes("self_evaluate"),
+          };
+
+          const completionStatus = checkCompletion(progress, completionCriteria);
+
+          // Send completion status to frontend
+          if (iterations > 2) {
+            sendEvent("completionStatus", {
+              score: completionStatus.completionScore,
+              isComplete: completionStatus.isComplete,
+              missingCriteria: completionStatus.missingCriteria,
+            });
+          }
 
           const response = await fetch(`${DEEPSEEK_BASE_URL}/v1/chat/completions`, {
             method: "POST",
@@ -975,6 +1068,7 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
             for (const toolCall of message.tool_calls) {
               const functionName = toolCall.function.name;
               usedTools.push(functionName);
+              toolHistory.push({ tool: functionName, timestamp: new Date() });
               let args;
 
               try {
@@ -1084,11 +1178,40 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                 });
 
               // ----------------------------------------------------------------
-              // TOOL: web_search
+              // TOOL: web_search (with caching and deduplication)
               // ----------------------------------------------------------------
               } else if (functionName === "web_search") {
                 const query = args.query || "";
                 const searchType = args.search_type || "general";
+
+                // Check for duplicate/similar query
+                const dupeCheck = memory.isDuplicateQuery(query);
+                if (dupeCheck.isDuplicate) {
+                  // Check cache first
+                  const cached = memory.getCachedSearch(query, searchType);
+                  if (cached) {
+                    sendEvent("action", {
+                      type: "search_complete",
+                      label: `Using cached results for similar query`,
+                      status: "completed",
+                    });
+
+                    latestSearchResults = cached.results;
+                    sendEvent("searchResults", latestSearchResults);
+
+                    messages.push({
+                      role: "tool",
+                      tool_call_id: toolCall.id,
+                      content: `Note: This query is similar to a previous search ("${dupeCheck.similar}"). Using cached results.\n\n` +
+                        cached.results.map((r, i) => {
+                          const authorityLabel = r.authority?.tier === "high" ? "★ HIGH" :
+                            r.authority?.tier === "medium" ? "◆ MED" : "○ LOW";
+                          return `${i + 1}. [${authorityLabel}] **${r.title}**\n   URL: ${r.url}\n   ${r.content}`;
+                        }).join("\n\n"),
+                    });
+                    continue;
+                  }
+                }
 
                 sendEvent("action", {
                   type: "searching",
@@ -1096,31 +1219,65 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   status: "running",
                 });
 
-                const searchResults = await executeSearch(query, searchType);
-                latestSearchResults = searchResults.results;
+                // Execute search with retry logic
+                const searchResult = await withRetry(
+                  () => executeSearch(query, searchType),
+                  "web_search",
+                  (attempt, error) => {
+                    sendEvent("action", {
+                      type: "searching",
+                      label: `Retrying search (attempt ${attempt + 1})...`,
+                      status: "running",
+                    });
+                  }
+                );
 
-                sendEvent("action", {
-                  type: "search_complete",
-                  label: `Found ${searchResults.results.length} results`,
-                  status: "completed",
-                });
+                if (searchResult.success) {
+                  const searchResults = searchResult.data;
+                  latestSearchResults = searchResults.results;
 
-                sendEvent("searchResults", latestSearchResults);
+                  // Cache the results
+                  memory.cacheSearch(query, searchResults.results, searchType);
 
-                // Format results with authority indicators
-                const formattedResults = searchResults.results
-                  .map((r, i) => {
-                    const authorityLabel = r.authority?.tier === "high" ? "★ HIGH" :
-                      r.authority?.tier === "medium" ? "◆ MED" : "○ LOW";
-                    return `${i + 1}. [${authorityLabel}] **${r.title}**\n   URL: ${r.url}\n   ${r.content}`;
-                  })
-                  .join("\n\n");
+                  sendEvent("action", {
+                    type: "search_complete",
+                    label: `Found ${searchResults.results.length} results`,
+                    status: "completed",
+                  });
 
-                messages.push({
-                  role: "tool",
-                  tool_call_id: toolCall.id,
-                  content: formattedResults || "No results found. Try a different query.",
-                });
+                  sendEvent("searchResults", latestSearchResults);
+
+                  // Format results with authority indicators
+                  const formattedResults = searchResults.results
+                    .map((r, i) => {
+                      const authorityLabel = r.authority?.tier === "high" ? "★ HIGH" :
+                        r.authority?.tier === "medium" ? "◆ MED" : "○ LOW";
+                      return `${i + 1}. [${authorityLabel}] **${r.title}**\n   URL: ${r.url}\n   ${r.content}`;
+                    })
+                    .join("\n\n");
+
+                  messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    content: formattedResults || "No results found. Try a different query.",
+                  });
+                } else {
+                  // Search failed after retries
+                  errorTracker.recordError("web_search", searchResult.error.type);
+                  const feedback = generateErrorFeedback("web_search", searchResult.error, searchResult.attempts);
+
+                  sendEvent("action", {
+                    type: "error",
+                    label: `Search failed: ${searchResult.error.message}`,
+                    status: "error",
+                  });
+
+                  messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    content: feedback,
+                  });
+                }
 
               // ----------------------------------------------------------------
               // TOOL: deep_search
@@ -1161,7 +1318,7 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                 });
 
               // ----------------------------------------------------------------
-              // TOOL: browse_website
+              // TOOL: browse_website (with caching and retry)
               // ----------------------------------------------------------------
               } else if (functionName === "browse_website") {
                 const url = args.url || "";
@@ -1173,6 +1330,27 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   displayUrl = urlObj.hostname + urlObj.pathname.substring(0, 25);
                 } catch {
                   displayUrl = url.substring(0, 35);
+                }
+
+                // Check for cached page content
+                const cachedPage = memory.getCachedPage(url);
+                if (cachedPage) {
+                  sendEvent("action", {
+                    type: "browsing",
+                    label: `Using cached content for ${displayUrl}`,
+                    status: "completed",
+                  });
+
+                  const authorityNote = cachedPage.authority?.tier === "high" ? "High-authority source" :
+                    cachedPage.authority?.tier === "medium" ? "Medium-authority source" :
+                    "Low-authority source - consider finding corroboration";
+
+                  messages.push({
+                    role: "tool",
+                    tool_call_id: toolCall.id,
+                    content: `# ${cachedPage.title || "Page Content"} (cached)\nURL: ${url}\nAuthority: ${authorityNote}\n${focus ? `\nLooking for: ${focus}\n` : ""}\n${cachedPage.content}`,
+                  });
+                  continue;
                 }
 
                 // Check source authority before browsing
@@ -1191,23 +1369,38 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   status: "loading",
                 });
 
-                const browseResult = await browsePage(url, focus, (status, data) => {
-                  const browserUpdate: Record<string, unknown> = {
-                    currentUrl: url,
-                    isActive: status === "loading" || status === "navigating" || status === "creating_session",
-                    status: status === "navigating" || status === "creating_session" ? "loading" : status,
-                  };
-                  // Include liveViewUrl and sessionId if provided
-                  if (data?.liveViewUrl) {
-                    browserUpdate.liveViewUrl = data.liveViewUrl as string;
+                // Execute browse with retry logic
+                const browseResult = await withRetry(
+                  () => browsePage(url, focus, (status, data) => {
+                    const browserUpdate: Record<string, unknown> = {
+                      currentUrl: url,
+                      isActive: status === "loading" || status === "navigating" || status === "creating_session",
+                      status: status === "navigating" || status === "creating_session" ? "loading" : status,
+                    };
+                    if (data?.liveViewUrl) {
+                      browserUpdate.liveViewUrl = data.liveViewUrl as string;
+                    }
+                    if (data?.sessionId) {
+                      browserUpdate.sessionId = data.sessionId as string;
+                    }
+                    sendEvent("browserState", browserUpdate);
+                  }),
+                  "browse_website",
+                  (attempt, error) => {
+                    sendEvent("action", {
+                      type: "browsing",
+                      label: `Retrying browse (attempt ${attempt + 1})...`,
+                      status: "running",
+                    });
                   }
-                  if (data?.sessionId) {
-                    browserUpdate.sessionId = data.sessionId as string;
-                  }
-                  sendEvent("browserState", browserUpdate);
-                });
+                );
 
-                if (browseResult) {
+                if (browseResult.success && browseResult.data) {
+                  const pageData = browseResult.data;
+
+                  // Cache the page content
+                  memory.cachePage(url, pageData.content, pageData.title, authority);
+
                   sendEvent("action", {
                     type: "browsing",
                     label: `Reading: ${displayUrl}...`,
@@ -1221,9 +1414,16 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   messages.push({
                     role: "tool",
                     tool_call_id: toolCall.id,
-                    content: `# ${browseResult.title || "Page Content"}\nURL: ${url}\nAuthority: ${authorityNote}\n${focus ? `\nLooking for: ${focus}\n` : ""}\n${browseResult.content}`,
+                    content: `# ${pageData.title || "Page Content"}\nURL: ${url}\nAuthority: ${authorityNote}\n${focus ? `\nLooking for: ${focus}\n` : ""}\n${pageData.content}`,
                   });
                 } else {
+                  // Browse failed - provide fallback suggestion
+                  errorTracker.recordError("browse_website", browseResult.success ? "unknown" : browseResult.error.type);
+                  const feedback = generateErrorFeedback("browse_website",
+                    browseResult.success ? { type: "unknown", message: "Empty response", retryable: false } : browseResult.error,
+                    browseResult.success ? 1 : browseResult.attempts
+                  );
+
                   sendEvent("action", {
                     type: "error",
                     label: "Failed to browse page",
@@ -1233,7 +1433,7 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   messages.push({
                     role: "tool",
                     tool_call_id: toolCall.id,
-                    content: "Failed to load this page. Try search results or a different URL.",
+                    content: feedback,
                   });
                 }
 
@@ -1282,6 +1482,9 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   label: `Validation: ${validation.confidence} confidence`,
                   status: "completed",
                 });
+
+                // Record validation in memory
+                memory.recordValidatedClaim(claim, validation.confidence, validation.sources);
 
                 // Send validation results to UI
                 sendEvent("validation", {
@@ -1345,7 +1548,7 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                 });
 
               // ----------------------------------------------------------------
-              // TOOL: self_evaluate (enhanced)
+              // TOOL: self_evaluate (enhanced with completion detection)
               // ----------------------------------------------------------------
               } else if (functionName === "self_evaluate") {
                 const whatFound = args.what_i_found || "";
@@ -1361,6 +1564,13 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
 
                 const qualityLabel = avgQuality >= 4 ? "excellent" : avgQuality >= 3 ? "good" : "needs improvement";
 
+                // Store quality metrics for tool selection
+                lastQualityMetrics = {
+                  sourceDiversity: metrics.source_diversity,
+                  factVerification: metrics.fact_verification,
+                  completeness: metrics.completeness,
+                };
+
                 sendEvent("action", {
                   type: "thinking",
                   label: `Self-evaluation: ${qualityLabel}`,
@@ -1374,6 +1584,26 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   recommendation,
                 });
 
+                // Check completion criteria
+                const progress: ResearchProgress = {
+                  sourcesCount: memory.getStats().uniqueUrls,
+                  highAuthoritySources: memory.getHighAuthoritySources().length,
+                  validatedClaimsCount: memory.getStats().validatedClaimsCount,
+                  findingsLength: newFindingsContent.length,
+                  qualityMetrics: {
+                    sourceDiversity: metrics.source_diversity || 3,
+                    factVerification: metrics.fact_verification || 3,
+                    completeness: metrics.completeness || 3,
+                    actionability: metrics.actionability || 3,
+                  },
+                  hasWrittenFindings,
+                  hasSelfEvaluated: true,
+                  lastSelfEvaluationRecommendation: recommendation,
+                };
+
+                const completionStatus = checkCompletion(progress, completionCriteria);
+                const completionFeedback = generateCompletionFeedback(completionStatus, iterations >= maxIterations - 2);
+
                 let guidance = `Self-Evaluation Complete:\n`;
                 guidance += `- Overall Quality: ${qualityLabel} (${avgQuality.toFixed(1)}/5)\n`;
                 guidance += `- Source Diversity: ${metrics.source_diversity || "?"}/5\n`;
@@ -1381,13 +1611,14 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                 guidance += `- Completeness: ${metrics.completeness || "?"}/5\n`;
                 guidance += `- Gaps: ${gaps.length > 0 ? gaps.join(", ") : "None identified"}\n`;
                 guidance += `- Recommendation: ${recommendation}\n\n`;
+                guidance += `**Completion Status (${completionStatus.completionScore}%):**\n${completionFeedback}`;
 
-                if (recommendation === "complete" && hasWrittenFindings) {
-                  guidance += "Research is complete. Good work!";
+                if (completionStatus.isComplete && hasWrittenFindings) {
+                  guidance += "\n\nResearch meets all quality criteria. You may complete this step.";
                 } else if (!hasWrittenFindings) {
-                  guidance += "IMPORTANT: Use write_findings to document your research before finishing.";
+                  guidance += "\n\nIMPORTANT: Use write_findings to document your research before finishing.";
                 } else if (recommendation !== "complete") {
-                  guidance += `Action needed: ${recommendation}`;
+                  guidance += `\n\nAction needed: ${recommendation}`;
                 }
 
                 messages.push({
