@@ -1,11 +1,24 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getSourceAuthority, type SourceAuthority } from "@/lib/source-quality";
+import Browserbase from "@browserbasehq/sdk";
+import { chromium, type Browser, type Page } from "playwright-core";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const SERPER_API_KEY = process.env.SERPER_API_KEY;
-const STEEL_API_KEY = process.env.STEEL_API_KEY;
+const BROWSERBASE_API_KEY = process.env.BROWSERBASE_API_KEY;
+const BROWSERBASE_PROJECT_ID = process.env.BROWSERBASE_PROJECT_ID;
+
+// Browserbase client for cloud browser sessions
+const browserbase = BROWSERBASE_API_KEY
+  ? new Browserbase({ apiKey: BROWSERBASE_API_KEY })
+  : null;
+
+// Active browser session management
+let activeBrowser: Browser | null = null;
+let activePage: Page | null = null;
+let activeSessionId: string | null = null;
 
 // ============================================================================
 // ENHANCED TOOL DEFINITIONS
@@ -573,54 +586,194 @@ async function executeDeepSearch(
 // PAGE BROWSING
 // ============================================================================
 
-async function browsePage(
-  url: string,
-  focus?: string,
-  onUpdate?: (status: string) => void
-): Promise<{ content: string; title?: string } | null> {
-  if (!STEEL_API_KEY) {
-    console.error("STEEL_API_KEY not configured");
+// Helper to get or create a Browserbase session
+async function getOrCreateBrowserSession(
+  onUpdate?: (status: string, data?: Record<string, unknown>) => void
+): Promise<{ browser: Browser; page: Page; sessionId: string; liveViewUrl: string } | null> {
+  if (!browserbase || !BROWSERBASE_PROJECT_ID) {
+    console.error("Browserbase not configured");
     return null;
   }
 
   try {
-    onUpdate?.("loading");
-
-    const response = await fetch("https://api.steel.dev/v1/scrape", {
-      method: "POST",
-      headers: {
-        "Steel-Api-Key": STEEL_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url,
-        format: ["markdown"],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("Steel scrape failed:", response.status);
-      onUpdate?.("error");
-      return null;
+    // Reuse existing session if available
+    if (activeBrowser && activePage && activeSessionId) {
+      const debugInfo = await browserbase.sessions.debug(activeSessionId);
+      return {
+        browser: activeBrowser,
+        page: activePage,
+        sessionId: activeSessionId,
+        liveViewUrl: debugInfo.debuggerFullscreenUrl,
+      };
     }
 
-    const data = await response.json();
-    onUpdate?.("complete");
+    // Create a new session
+    onUpdate?.("creating_session");
+    const session = await browserbase.sessions.create({
+      projectId: BROWSERBASE_PROJECT_ID,
+      browserSettings: {
+        solveCaptchas: true,
+      },
+    });
 
-    let content = data.content || data.markdown || data.html || "";
+    // Get live view URL for real-time viewing
+    const debugInfo = await browserbase.sessions.debug(session.id);
+    const liveViewUrl = debugInfo.debuggerFullscreenUrl;
 
-    // Increased content limit for more thorough extraction
+    // Notify frontend of live view URL
+    onUpdate?.("session_ready", { liveViewUrl, sessionId: session.id });
+
+    // Connect via Playwright
+    const browser = await chromium.connectOverCDP(session.connectUrl);
+    const context = browser.contexts()[0];
+    const page = context.pages()[0];
+
+    // Store for reuse
+    activeBrowser = browser;
+    activePage = page;
+    activeSessionId = session.id;
+
+    return { browser, page, sessionId: session.id, liveViewUrl };
+  } catch (error) {
+    console.error("Failed to create browser session:", error);
+    return null;
+  }
+}
+
+// Close the active browser session
+async function closeBrowserSession() {
+  if (activeBrowser) {
+    try {
+      await activeBrowser.close();
+    } catch (e) {
+      // Ignore close errors
+    }
+    activeBrowser = null;
+    activePage = null;
+    activeSessionId = null;
+  }
+}
+
+async function browsePage(
+  url: string,
+  focus?: string,
+  onUpdate?: (status: string, data?: Record<string, unknown>) => void
+): Promise<{ content: string; title?: string; liveViewUrl?: string } | null> {
+  try {
+    onUpdate?.("loading");
+
+    // Get or create a Browserbase session
+    const session = await getOrCreateBrowserSession(onUpdate);
+    if (!session) {
+      // Fallback to simple fetch if Browserbase isn't configured
+      return await simplePageFetch(url);
+    }
+
+    const { page, liveViewUrl } = session;
+
+    // Navigate to the URL
+    onUpdate?.("navigating", { url, liveViewUrl });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+    // Wait a bit for dynamic content
+    await page.waitForTimeout(2000);
+
+    // Get the page title
+    const title = await page.title();
+
+    // Extract content - get text content for LLM processing
+    let content = await page.evaluate(() => {
+      // Remove script and style elements
+      const scripts = document.querySelectorAll("script, style, noscript");
+      scripts.forEach((el) => el.remove());
+
+      // Get main content areas first, fallback to body
+      const mainContent =
+        document.querySelector("main, article, [role='main']") || document.body;
+
+      // Get text content with some structure preserved
+      const getText = (el: Element): string => {
+        const tagName = el.tagName.toLowerCase();
+
+        // Headers
+        if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(tagName)) {
+          return `\n\n${"#".repeat(parseInt(tagName[1]))} ${el.textContent?.trim()}\n`;
+        }
+
+        // Paragraphs and divs
+        if (["p", "div", "section"].includes(tagName)) {
+          const text = el.textContent?.trim();
+          if (text && text.length > 10) {
+            return `\n${text}\n`;
+          }
+        }
+
+        // Lists
+        if (tagName === "li") {
+          return `\n- ${el.textContent?.trim()}`;
+        }
+
+        // Links
+        if (tagName === "a") {
+          const href = (el as HTMLAnchorElement).href;
+          const text = el.textContent?.trim();
+          if (text && href) {
+            return `[${text}](${href})`;
+          }
+        }
+
+        return el.textContent?.trim() || "";
+      };
+
+      return getText(mainContent);
+    });
+
+    onUpdate?.("complete", { liveViewUrl });
+
+    // Truncate if too long
     if (content.length > 15000) {
       content = content.substring(0, 15000) + "\n\n[Content truncated for length...]";
     }
 
-    return {
-      content,
-      title: data.title || data.metadata?.title,
-    };
+    return { content, title, liveViewUrl };
   } catch (error) {
-    console.error("Steel browse error:", error);
+    console.error("Browserbase browse error:", error);
     onUpdate?.("error");
+    // Try simple fetch as fallback
+    return await simplePageFetch(url);
+  }
+}
+
+// Simple fallback fetch without browser
+async function simplePageFetch(url: string): Promise<{ content: string; title?: string } | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SageBot/1.0)",
+      },
+    });
+    if (!response.ok) return null;
+
+    const html = await response.text();
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : undefined;
+
+    // Basic HTML to text conversion
+    let content = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (content.length > 15000) {
+      content = content.substring(0, 15000) + "\n\n[Content truncated...]";
+    }
+
+    return { content, title };
+  } catch {
     return null;
   }
 }
@@ -1035,14 +1188,23 @@ Execute this step thoroughly. Quality and accuracy over speed.`;
                   currentUrl: url,
                   isActive: true,
                   authority,
+                  status: "loading",
                 });
 
-                const browseResult = await browsePage(url, focus, (status) => {
-                  sendEvent("browserState", {
+                const browseResult = await browsePage(url, focus, (status, data) => {
+                  const browserUpdate: Record<string, unknown> = {
                     currentUrl: url,
-                    isActive: status === "loading",
-                    status,
-                  });
+                    isActive: status === "loading" || status === "navigating" || status === "creating_session",
+                    status: status === "navigating" || status === "creating_session" ? "loading" : status,
+                  };
+                  // Include liveViewUrl and sessionId if provided
+                  if (data?.liveViewUrl) {
+                    browserUpdate.liveViewUrl = data.liveViewUrl as string;
+                  }
+                  if (data?.sessionId) {
+                    browserUpdate.sessionId = data.sessionId as string;
+                  }
+                  sendEvent("browserState", browserUpdate);
                 });
 
                 if (browseResult) {

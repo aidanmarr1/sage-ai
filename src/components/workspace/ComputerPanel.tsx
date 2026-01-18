@@ -85,7 +85,7 @@ export function ComputerPanel() {
             <Globe className="h-4 w-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="font-medium text-grey-900">Web Browser</h2>
+            <h2 className="font-medium text-grey-900">Live Browser</h2>
             {browserState.currentUrl && (
               <p className="text-xs text-grey-500 truncate">
                 {browserState.currentUrl}
@@ -98,14 +98,23 @@ export function ComputerPanel() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sage-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-sage-500" />
               </span>
-              Active
+              Live
             </div>
           )}
         </div>
 
-        {/* Browser Content - Show screenshot if available, otherwise status */}
+        {/* Browser Content - Show live view iframe if available */}
         <div className="flex-1 overflow-hidden bg-gradient-to-br from-grey-50 to-grey-100">
-          {browserState.screenshot ? (
+          {browserState.liveViewUrl ? (
+            <div className="h-full w-full">
+              <iframe
+                src={browserState.liveViewUrl}
+                className="h-full w-full border-0"
+                allow="clipboard-read; clipboard-write"
+                title="Live Browser View"
+              />
+            </div>
+          ) : browserState.screenshot ? (
             <div className="h-full w-full p-4">
               <div className="relative h-full w-full overflow-hidden rounded-xl border border-grey-200 bg-white shadow-lg">
                 {/* Screenshot header */}
@@ -129,14 +138,6 @@ export function ComputerPanel() {
                     alt="Browser screenshot"
                     className="w-full object-contain"
                   />
-                  {(browserState.isActive || browserState.status === "loading") && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm">
-                      <div className="flex flex-col items-center">
-                        <Loader2 className="h-8 w-8 animate-spin text-sage-500" />
-                        <span className="mt-2 text-sm text-grey-600">Updating...</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -152,10 +153,10 @@ export function ComputerPanel() {
                       </div>
                     </div>
                     <h3 className="font-serif text-xl font-semibold text-grey-900">
-                      Extracting Content
+                      Starting Browser
                     </h3>
                     <p className="mt-2 max-w-xs text-sm text-grey-500">
-                      Reading and analyzing the page content...
+                      Launching cloud browser session...
                     </p>
                   </>
                 ) : browserState.status === "complete" ? (
@@ -183,7 +184,7 @@ export function ComputerPanel() {
                       Browse Failed
                     </h3>
                     <p className="mt-2 max-w-xs text-sm text-grey-500">
-                      Could not extract content from this page.
+                      Could not start browser session.
                     </p>
                   </>
                 )}
@@ -203,7 +204,7 @@ export function ComputerPanel() {
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sage-500" />
                 </span>
                 <span className="text-xs font-medium text-sage-600">
-                  {browserState.screenshot ? "Browsing" : "Extracting"}
+                  {browserState.liveViewUrl ? "Live" : "Starting..."}
                 </span>
               </>
             ) : (
@@ -214,10 +215,10 @@ export function ComputerPanel() {
             )}
           </div>
           <span className="text-xs text-grey-500">
-            {browserState.status === "loading"
-              ? "Reading page..."
-              : browserState.screenshot
-                ? "Screenshot captured"
+            {browserState.liveViewUrl
+              ? "Real-time browser view"
+              : browserState.status === "loading"
+                ? "Connecting..."
                 : "Content ready"}
           </span>
         </div>
