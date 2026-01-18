@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useRef, KeyboardEvent, useState } from "react";
+import { useCallback, useRef, KeyboardEvent, useState, useEffect, DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useChatStore } from "@/stores/chatStore";
 import { usePlanStore } from "@/stores/planStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useConversationStore } from "@/stores/conversationStore";
 import { useAuthStore } from "@/stores/authStore";
-import { Send, Paperclip, Smile, Sparkles, X } from "lucide-react";
+import { Send, Paperclip, Smile, Sparkles, X, Image as ImageIcon, Upload, Zap } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { EmojiPicker } from "./EmojiPicker";
 import { nanoid } from "nanoid";
@@ -18,14 +18,106 @@ export function ChatInput() {
   const { inputValue, setInputValue, addMessage, setTyping, clearMessages } = useChatStore();
   const { setPlan, setGenerating } = usePlanStore();
   const { setActiveTab } = useWorkspaceStore();
-  const { currentConversationId, createConversation, setCurrentConversation } = useConversationStore();
+  const { currentConversationId, createConversation } = useConversationStore();
   const { isAuthenticated } = useAuthStore();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Handle paste events for images
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            handleImageFile(file);
+          }
+        }
+      }
+    };
+
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, []);
+
+  const handleImageFile = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    if (file.size > 10 * 1024 * 1024) {
+      // 10MB limit
+      alert("Image must be less than 10MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const url = event.target?.result as string;
+      setAttachedImages((prev) => [
+        ...prev,
+        {
+          id: nanoid(),
+          url,
+          name: file.name,
+          size: file.size,
+        },
+      ]);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer?.types.includes("Files")) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set false if leaving the container entirely
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (
+        clientX < rect.left ||
+        clientX > rect.right ||
+        clientY < rect.top ||
+        clientY > rect.bottom
+      ) {
+        setIsDragging(false);
+      }
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer?.files;
+    if (!files) return;
+
+    Array.from(files).forEach((file) => {
+      handleImageFile(file);
+    });
+  }, [handleImageFile]);
 
   const handleEmojiSelect = (emoji: string) => {
     setInputValue(inputValue + emoji);
@@ -37,27 +129,11 @@ export function ChatInput() {
     if (!files) return;
 
     Array.from(files).forEach((file) => {
-      if (!file.type.startsWith("image/")) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const url = event.target?.result as string;
-        setAttachedImages((prev) => [
-          ...prev,
-          {
-            id: nanoid(),
-            url,
-            name: file.name,
-            size: file.size,
-          },
-        ]);
-      };
-      reader.readAsDataURL(file);
+      handleImageFile(file);
     });
 
-    // Reset input so same file can be selected again
     e.target.value = "";
-  }, []);
+  }, [handleImageFile]);
 
   const removeImage = useCallback((id: string) => {
     setAttachedImages((prev) => prev.filter((img) => img.id !== id));
@@ -95,13 +171,11 @@ export function ChatInput() {
     setIsProcessing(true);
     setTyping(true);
 
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
 
     try {
-      // Step 1: ALWAYS create conversation first (if authenticated and none exists)
       let convId = currentConversationId;
       if (isAuthenticated && !convId) {
         const title = userMessage.slice(0, 50) + (userMessage.length > 50 ? "..." : "");
@@ -119,12 +193,10 @@ export function ChatInput() {
         }
       }
 
-      // Save user message to database
       if (convId) {
         await saveMessage(convId, "user", userMessage);
       }
 
-      // Step 2: Classify to determine response type (actionable task vs conversational)
       const classifyResponse = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -145,7 +217,6 @@ export function ChatInput() {
       const classifyResult = (classifyData.content || "").toLowerCase().trim();
       const isActionable = classifyResult.includes("task") && !classifyResult.includes("greeting");
 
-      // Step 3: Get appropriate response
       const responseType = isActionable ? "acknowledge" : "greeting";
       const responseRequest = await fetch("/api/chat", {
         method: "POST",
@@ -168,17 +239,14 @@ export function ChatInput() {
         status: "sent",
       });
 
-      // Save assistant message to database
       if (convId) {
         await saveMessage(convId, "assistant", responseData.content);
       }
 
-      // Step 4: If actionable, generate plan. Otherwise we're done.
       if (!isActionable) {
         return;
       }
 
-      // Step 5: Generate plan for actionable tasks
       setGenerating(true);
       setActiveTab("plan");
 
@@ -199,15 +267,10 @@ export function ChatInput() {
       }
 
       const planData = await planResponse.json();
-
-      // Parse the plan content into steps
       const planContent = planData.content;
       const lines = planContent.split("\n").filter((line: string) => line.trim());
-
-      // Extract overview (first line or first sentence)
       const overview = lines[0] || "Working on your request...";
 
-      // Extract numbered steps
       const steps = lines
         .slice(1)
         .filter((line: string) => /^\d+[.)]/.test(line.trim()))
@@ -219,7 +282,6 @@ export function ChatInput() {
           isEditing: false,
         }));
 
-      // If no numbered steps found, use all remaining lines as steps
       const finalSteps = steps.length > 0 ? steps : lines.slice(1).map((line: string) => ({
         id: nanoid(),
         content: line.trim(),
@@ -266,8 +328,6 @@ export function ChatInput() {
   const handleInput = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setInputValue(e.target.value);
-
-      // Auto-resize textarea
       const textarea = e.target;
       textarea.style.height = "auto";
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
@@ -276,8 +336,10 @@ export function ChatInput() {
   );
 
   const characterCount = inputValue.length;
+  const maxChars = 4000;
+  const charPercentage = Math.min((characterCount / maxChars) * 100, 100);
   const isNearLimit = characterCount > 3500;
-  const isOverLimit = characterCount > 4000;
+  const isOverLimit = characterCount > maxChars;
 
   return (
     <div className="relative border-t border-grey-100 bg-white p-4">
@@ -285,43 +347,72 @@ export function ChatInput() {
       <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-sage-200 to-transparent" />
 
       <div
+        ref={containerRef}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         className={cn(
           "relative rounded-2xl border-2 bg-white transition-all duration-300",
-          isFocused
-            ? "border-sage-400 shadow-lg shadow-sage-100/50 ring-4 ring-sage-100/50"
-            : "border-grey-200 shadow-sm hover:border-grey-300"
+          isDragging
+            ? "border-sage-400 bg-sage-50 shadow-lg shadow-sage-100/50 ring-4 ring-sage-100"
+            : isFocused
+              ? "border-sage-400 shadow-lg shadow-sage-100/50 ring-4 ring-sage-100/50"
+              : "border-grey-200 shadow-sm hover:border-grey-300"
         )}
       >
+        {/* Drag overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-2xl bg-sage-50/95 backdrop-blur-sm">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sage-100 mb-3">
+              <Upload className="h-8 w-8 text-sage-600" />
+            </div>
+            <p className="text-sage-700 font-medium">Drop images here</p>
+            <p className="text-sage-500 text-sm mt-1">PNG, JPG up to 10MB</p>
+          </div>
+        )}
+
         {/* Image previews */}
         {attachedImages.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto border-b border-grey-100 p-2">
+          <div className="flex gap-2 overflow-x-auto border-b border-grey-100 p-3">
             {attachedImages.map((img) => (
               <div
                 key={img.id}
-                className="group relative flex-shrink-0"
+                className="group relative flex-shrink-0 animate-fade-in-up"
               >
-                <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-grey-200">
+                <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-grey-200 shadow-sm">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={img.url}
                     alt={img.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <button
                   onClick={() => removeImage(img.id)}
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-grey-800 text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 hover:bg-grey-900"
+                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-grey-800 text-white shadow-lg transition-all opacity-0 group-hover:opacity-100 hover:bg-grey-900 hover:scale-110"
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
+                <span className="absolute bottom-1 left-1 right-1 text-[10px] text-white font-medium truncate bg-black/40 rounded px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {img.name}
+                </span>
               </div>
             ))}
+            {/* Add more button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-20 w-20 flex-shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-grey-200 text-grey-400 transition-all hover:border-sage-300 hover:bg-sage-50 hover:text-sage-500"
+            >
+              <ImageIcon className="h-5 w-5 mb-1" />
+              <span className="text-[10px] font-medium">Add</span>
+            </button>
           </div>
         )}
 
         {/* Input row */}
-        <div className="flex items-end gap-2 p-2">
-          {/* Hidden file input */}
+        <div className="flex items-end gap-2 p-3">
           <input
             ref={fileInputRef}
             type="file"
@@ -341,6 +432,7 @@ export function ChatInput() {
                   ? "bg-sage-100 text-sage-600"
                   : "text-grey-400 hover:bg-grey-100 hover:text-grey-600"
               )}
+              title="Attach images (or drag & drop)"
             >
               <Paperclip className="h-5 w-5" />
             </button>
@@ -357,7 +449,6 @@ export function ChatInput() {
                 <Smile className="h-5 w-5" />
               </button>
 
-              {/* Emoji Picker */}
               {showEmojiPicker && (
                 <div className="absolute bottom-12 left-0 z-50 animate-fade-in">
                   <EmojiPicker
@@ -378,7 +469,7 @@ export function ChatInput() {
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Ask Sage anything..."
+              placeholder="Ask Sage anything... (paste or drop images)"
               rows={1}
               className="max-h-[200px] min-h-[44px] w-full resize-none bg-transparent py-3 text-[15px] text-grey-900 placeholder:text-grey-400 focus:outline-none"
             />
@@ -396,58 +487,74 @@ export function ChatInput() {
             )}
           >
             {isProcessing ? (
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-grey-300 border-t-grey-600" />
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             ) : (inputValue.trim() || attachedImages.length > 0) && !isOverLimit ? (
-              <Sparkles className="h-5 w-5 transition-transform group-hover:rotate-12" />
+              <Zap className="h-5 w-5 transition-transform group-hover:scale-110" />
             ) : (
               <Send className="h-5 w-5" />
             )}
           </button>
         </div>
 
-        {/* Bottom bar */}
+        {/* Bottom bar with progress */}
         <div className="flex items-center justify-between border-t border-grey-100 bg-grey-50/50 px-4 py-2">
-          {/* Keyboard hints - hidden on mobile */}
           <div className="hidden md:flex items-center gap-3 text-xs text-grey-400">
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <kbd className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] text-grey-500 shadow-sm ring-1 ring-grey-200">
                 Enter
               </kbd>
-              <span>to send</span>
+              <span>send</span>
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <kbd className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] text-grey-500 shadow-sm ring-1 ring-grey-200">
-                Shift + Enter
+                ⌘V
               </kbd>
-              <span>for new line</span>
+              <span>paste images</span>
             </span>
           </div>
 
-          {/* Mobile helper text */}
           <span className="md:hidden text-xs text-grey-400">
-            Tap send or press enter
+            Tap to send
           </span>
 
-          {characterCount > 0 && (
-            <span
-              className={cn(
-                "text-xs font-medium transition-colors",
-                isOverLimit
-                  ? "text-grey-700"
-                  : isNearLimit
-                  ? "text-sage-600"
-                  : "text-grey-400"
-              )}
-            >
-              {characterCount.toLocaleString()} / 4,000
-            </span>
-          )}
+          {/* Character limit with visual progress */}
+          <div className="flex items-center gap-2">
+            {characterCount > 0 && (
+              <>
+                <div className="w-16 h-1.5 bg-grey-200 rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-300",
+                      isOverLimit
+                        ? "bg-grey-600"
+                        : isNearLimit
+                          ? "bg-sage-500"
+                          : "bg-sage-400"
+                    )}
+                    style={{ width: `${charPercentage}%` }}
+                  />
+                </div>
+                <span
+                  className={cn(
+                    "text-xs font-medium tabular-nums transition-colors",
+                    isOverLimit
+                      ? "text-grey-700"
+                      : isNearLimit
+                        ? "text-sage-600"
+                        : "text-grey-400"
+                  )}
+                >
+                  {characterCount.toLocaleString()}
+                </span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* AI hint - hidden on mobile */}
+      {/* Hint */}
       <p className="mt-3 hidden md:block text-center text-xs text-grey-400">
-        Sage may make mistakes. Please verify important information.
+        Sage can help with research, writing, analysis, and more
       </p>
     </div>
   );
